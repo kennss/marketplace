@@ -8,8 +8,9 @@ use mpl_token_metadata::{
     types::AuthorizationData,
 };
 use tensor_toolbox::{
-    assert_fee_account,
+    assert_fee_account, calc_fees,
     token_metadata::{assert_decode_metadata, transfer, TransferArgs},
+    CalcFeesArgs, Fees, BROKER_FEE_PCT, MAKER_BROKER_PCT, TAKER_FEE_BPS,
 };
 use tensor_vipers::Validate;
 use tensorswap::program::EscrowProgram;
@@ -160,6 +161,14 @@ pub struct TakeBidLegacy<'info> {
         constraint = rent_destination.key() == bid_state.get_rent_payer() @ TcompError::BadRentDest
     )]
     pub rent_destination: UncheckedAccount<'info>,
+
+    // ---------------------------- SnowChat Community Fee Share (optional)
+    #[account(mut)]
+    pub community_registration: Option<Account<'info, crate::CommunityRegistration>>,
+
+    /// CHECK: validated against community_registration.leader_wallet in handler.
+    #[account(mut)]
+    pub leader_wallet: Option<UncheckedAccount<'info>>,
     //
     // Remaining accounts:
     // 1. creators (1-5)
@@ -372,6 +381,33 @@ pub fn process_take_bid_legacy<'info>(
         },
     ))?;
 
+    // ---------------- SnowChat Community Fee Share — compute split upfront
+    // Protocol fee is computed inside take_bid_shared, so we replicate the
+    // calc here to know the value needed by apply_community_share. This keeps
+    // the validation in the handler (closer to metadata context) and lets
+    // take_bid_shared focus on the transfers.
+    let community_split = if ctx.accounts.community_registration.is_some() {
+        let Fees {
+            protocol_fee: tcomp_fee,
+            ..
+        } = calc_fees(CalcFeesArgs {
+            amount: ctx.accounts.bid_state.amount,
+            tnsr_discount: false,
+            total_fee_bps: TAKER_FEE_BPS,
+            broker_fee_pct: BROKER_FEE_PCT,
+            maker_broker_pct: MAKER_BROKER_PCT,
+        })?;
+        Some(crate::community::apply_community_share(
+            tcomp_fee,
+            &metadata,
+            &ctx.accounts.metadata.to_account_info(),
+            ctx.accounts.community_registration.as_ref(),
+            ctx.accounts.leader_wallet.as_ref(),
+        )?)
+    } else {
+        None
+    };
+
     take_bid_shared(TakeBidArgs {
         bid_state: &mut ctx.accounts.bid_state,
         seller: &ctx.accounts.seller.to_account_info(),
@@ -396,5 +432,7 @@ pub fn process_take_bid_legacy<'info>(
         marketplace_prog: &ctx.accounts.marketplace_program,
         escrow_prog: &ctx.accounts.escrow_program,
         system_prog: &ctx.accounts.system_program,
+        community_split,
+        community_registration: ctx.accounts.community_registration.as_mut(),
     })
 }

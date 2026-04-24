@@ -299,5 +299,7 @@ pub fn process_take_bid_t22<'info>(
         marketplace_prog: &ctx.accounts.marketplace_program,
         escrow_prog: &ctx.accounts.escrow_program,
         system_prog: &ctx.accounts.system_program,
+        community_split: None,
+        community_registration: None,
     })
 }

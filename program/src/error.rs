@@ -150,4 +150,44 @@ pub enum TcompError {
 
     #[msg("Invalid mint")]
     InvalidMint = 148,
+
+    // ----------------------------------------- SnowChat Community Fee Share
+    // Reserved range 200..=249 — leaves 149..=199 free for Tensor upstream
+    // additions to minimise merge conflicts.
+
+    #[msg("update authority does not match leader signer")]
+    CommunityUpdateAuthorityMismatch = 200,
+
+    #[msg("NFT metadata has no creators")]
+    CommunityNoCreators = 201,
+
+    #[msg("leader is not a verified creator on the metadata")]
+    CommunityLeaderNotVerified = 202,
+
+    #[msg("registration cooldown still active (30 days)")]
+    CommunityCooldownActive = 203,
+
+    #[msg("registration already revoked")]
+    CommunityAlreadyRevoked = 204,
+
+    #[msg("registration is revoked")]
+    CommunityRegistrationRevoked = 205,
+
+    #[msg("collection mint mismatch between registration and listing")]
+    CommunityCollectionMismatch = 206,
+
+    #[msg("leader wallet account is required when community registration provided")]
+    CommunityLeaderAccountMissing = 207,
+
+    #[msg("leader wallet does not match registration")]
+    CommunityLeaderMismatch = 208,
+
+    #[msg("metadata hash mismatch — collection updated since registration")]
+    CommunityMetadataHashMismatch = 209,
+
+    #[msg("NFT metadata has no collection link")]
+    CommunityNoCollection = 210,
+
+    #[msg("schema version mismatch on community registration")]
+    CommunityWrongVersion = 211,
 }

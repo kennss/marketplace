@@ -3,6 +3,7 @@
 #![allow(clippy::result_large_err)] // Needed otherwise clippy unhappy w/ anchor errors
 
 pub mod bubblegum_adapter;
+pub mod community;
 pub mod error;
 pub mod event;
 pub mod instructions;
@@ -29,6 +30,7 @@ pub use anchor_lang::{
 };
 pub use anchor_spl::associated_token::{create_idempotent, AssociatedToken, Create};
 pub use bubblegum_adapter::*;
+pub use community::*;
 pub use error::*;
 pub use event::*;
 pub use instructions::*;
@@ -494,5 +496,30 @@ pub mod marketplace_program {
         min_amount: u64,
     ) -> Result<()> {
         instructions::mpl_core::process_take_bid_core(ctx, min_amount)
+    }
+
+    // ----------------------------------- SnowChat Community Fee Share
+
+    /// Register an NFT collection for community fee share. Caller must be
+    /// the metadata `update_authority` and a verified creator.
+    pub fn register_community_collection(
+        ctx: Context<RegisterCommunityCollection>,
+        leader_snowchat_id: [u8; 36],
+        channel_id: [u8; 32],
+    ) -> Result<()> {
+        community::register::process_register_community_collection(
+            ctx,
+            leader_snowchat_id,
+            channel_id,
+        )
+    }
+
+    /// Voluntarily revoke a previously registered community collection.
+    /// Soft-deletes the registration; PDA stays open with cumulative stats
+    /// preserved for audit. Subject to 30-day cooldown from registration.
+    pub fn revoke_community_collection(
+        ctx: Context<RevokeCommunityCollection>,
+    ) -> Result<()> {
+        community::revoke::process_revoke_community_collection(ctx)
     }
 }

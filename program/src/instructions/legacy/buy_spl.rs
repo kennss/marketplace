@@ -18,9 +18,9 @@ use tensor_toolbox::{
 use tensor_vipers::{unwrap_checked, Validate};
 
 use crate::{
-    assert_decode_token_account, program::MarketplaceProgram, record_event, AuthorizationDataLocal,
-    ListState, TakeEvent, Target, TcompError, TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION,
-    TNSR_CURRENCY,
+    apply_community_share, assert_decode_token_account, program::MarketplaceProgram, record_event,
+    record_share_distribution, AuthorizationDataLocal, CommunityRegistration, ListState, TakeEvent,
+    Target, TcompError, TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION, TNSR_CURRENCY,
 };
 
 #[derive(Accounts)]
@@ -187,6 +187,27 @@ pub struct BuyLegacySpl<'info> {
     pub sysvar_instructions: Option<UncheckedAccount<'info>>,
 
     pub cosigner: Option<Signer<'info>>,
+
+    // ------------------------------------------- SnowChat Community Fee Share
+    // Optional trio. When community_registration is Some, the protocol fee
+    // is split 50/50 and the leader_share flows to `leader_currency_ta` (the
+    // leader wallet's ATA for the listing currency). Rent for ATA init is
+    // paid by the buyer (payer). When None, behaviour is identical to
+    // upstream Tensor.
+    #[account(mut)]
+    pub community_registration: Option<Account<'info, CommunityRegistration>>,
+
+    /// CHECK: validated against community_registration.leader_wallet in handler.
+    pub leader_wallet: Option<UncheckedAccount<'info>>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = currency,
+        associated_token::authority = leader_wallet,
+        associated_token::token_program = currency_token_program,
+    )]
+    pub leader_currency_ta: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
     //
     // ----------------------------------------------------- Remaining accounts
     // 1. creators (1-5)
@@ -426,11 +447,35 @@ pub fn process_buy_legacy_spl<'info, 'b>(
 
     // --Pay fees in currency--
 
-    // Protocol fee.
+    // Protocol fee — may split between platform vault + community leader.
+    let community_split = apply_community_share(
+        tcomp_fee,
+        &metadata,
+        &ctx.accounts.metadata.to_account_info(),
+        ctx.accounts.community_registration.as_ref(),
+        ctx.accounts.leader_wallet.as_ref(),
+    )?;
+
     ctx.accounts.transfer_currency(
         &ctx.accounts.fee_vault_currency_ta.to_account_info(),
-        tcomp_fee,
+        community_split.platform_share,
     )?;
+
+    if community_split.leader_share > 0 {
+        let leader_ta = ctx
+            .accounts
+            .leader_currency_ta
+            .as_ref()
+            .ok_or_else(|| error!(TcompError::CommunityLeaderAccountMissing))?;
+        ctx.accounts.transfer_currency(
+            &leader_ta.to_account_info(),
+            community_split.leader_share,
+        )?;
+        record_share_distribution(
+            ctx.accounts.community_registration.as_mut().unwrap(),
+            community_split.leader_share,
+        )?;
+    }
 
     // Maker broker fee.
     ctx.accounts.transfer_currency(

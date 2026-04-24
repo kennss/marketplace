@@ -15,8 +15,9 @@ use tensor_toolbox::{
 use tensor_vipers::{unwrap_checked, Validate};
 
 use crate::{
-    program::MarketplaceProgram, record_event, AuthorizationDataLocal, ListState, TakeEvent,
-    Target, TcompError, TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION,
+    apply_community_share, program::MarketplaceProgram, record_event, record_share_distribution,
+    AuthorizationDataLocal, CommunityRegistration, ListState, TakeEvent, Target, TcompError,
+    TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION,
 };
 
 #[derive(Accounts)]
@@ -150,6 +151,19 @@ pub struct BuyLegacy<'info> {
     pub sysvar_instructions: Option<UncheckedAccount<'info>>,
 
     pub cosigner: Option<Signer<'info>>,
+
+    // ------------------------------------------- SnowChat Community Fee Share
+    // All three accounts are optional. When `community_registration` is None
+    // the existing Tensor fee distribution is preserved bit-for-bit. When
+    // present the protocol fee is split 50/50 between `fee_vault` (platform)
+    // and `leader_wallet` (community leader), validated cross-checks against
+    // metadata.creators[] and metadata hash.
+    #[account(mut)]
+    pub community_registration: Option<Account<'info, CommunityRegistration>>,
+
+    /// CHECK: validated against community_registration.leader_wallet in handler.
+    #[account(mut)]
+    pub leader_wallet: Option<UncheckedAccount<'info>>,
     //
     // ----------------------------------------------------- Remaining accounts
     //
@@ -293,9 +307,29 @@ pub fn process_buy_legacy<'info, 'b>(
         Some(&[&ctx.accounts.list_state.seeds()]),
     )?;
 
-    // pay fees
+    // pay fees — protocol fee may split between platform vault + community leader
 
-    transfer_lamports(&ctx.accounts.payer, &ctx.accounts.fee_vault, tcomp_fee)?;
+    let community_split = apply_community_share(
+        tcomp_fee,
+        &metadata,
+        &ctx.accounts.metadata.to_account_info(),
+        ctx.accounts.community_registration.as_ref(),
+        ctx.accounts.leader_wallet.as_ref(),
+    )?;
+
+    transfer_lamports(
+        &ctx.accounts.payer,
+        &ctx.accounts.fee_vault,
+        community_split.platform_share,
+    )?;
+
+    if let Some(leader_info) = community_split.leader_account.as_ref() {
+        transfer_lamports(&ctx.accounts.payer, leader_info, community_split.leader_share)?;
+        record_share_distribution(
+            ctx.accounts.community_registration.as_mut().unwrap(),
+            community_split.leader_share,
+        )?;
+    }
 
     transfer_lamports_checked(
         &ctx.accounts.payer,

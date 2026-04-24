@@ -163,6 +163,8 @@ impl<'info> TakeBidCompressed<'info> {
             marketplace_prog: &self.marketplace_program,
             escrow_prog: &self.tensorswap_program,
             system_prog: &self.system_program,
+            community_split: None,
+            community_registration: None,
         })
     }
 }

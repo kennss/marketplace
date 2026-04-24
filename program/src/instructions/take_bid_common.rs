@@ -30,6 +30,15 @@ pub struct TakeBidArgs<'a, 'info> {
     pub marketplace_prog: &'a Program<'info, crate::program::MarketplaceProgram>,
     pub escrow_prog: &'a Program<'info, EscrowProgram>,
     pub system_prog: &'a Program<'info, System>,
+
+    // ---------------------------- SnowChat Community Fee Share (optional)
+    // When `community_split` is Some, the protocol fee is routed to
+    // `split.platform_share` → fee_vault and `split.leader_share` →
+    // `split.leader_account`. When None, existing Tensor behaviour is
+    // preserved (entire `tcomp_fee` → fee_vault). Non-legacy callers
+    // (compressed / mpl_core / token22 / wns) pass None for both fields.
+    pub community_split: Option<crate::community::CommunityShareSplit<'info>>,
+    pub community_registration: Option<&'a mut Account<'info, crate::community::CommunityRegistration>>,
 }
 
 pub fn take_bid_shared(args: TakeBidArgs) -> Result<()> {
@@ -52,6 +61,8 @@ pub fn take_bid_shared(args: TakeBidArgs) -> Result<()> {
         marketplace_prog,
         escrow_prog,
         system_prog,
+        community_split,
+        community_registration,
     } = args;
 
     // Verify & increment quantity
@@ -141,8 +152,18 @@ pub fn take_bid_shared(args: TakeBidArgs) -> Result<()> {
         )?;
     }
 
-    // Pay fees
-    transfer_lamports_from_pda(bid_state.deref().as_ref(), fee_vault, tcomp_fee)?;
+    // Pay fees — protocol fee may split between platform vault + community leader
+    if let Some(split) = community_split.as_ref() {
+        transfer_lamports_from_pda(bid_state.deref().as_ref(), fee_vault, split.platform_share)?;
+        if let Some(leader_info) = split.leader_account.as_ref() {
+            transfer_lamports_from_pda(bid_state.deref().as_ref(), leader_info, split.leader_share)?;
+            if let Some(reg) = community_registration {
+                crate::community::record_share_distribution(reg, split.leader_share)?;
+            }
+        }
+    } else {
+        transfer_lamports_from_pda(bid_state.deref().as_ref(), fee_vault, tcomp_fee)?;
+    }
 
     transfer_lamports_checked(
         bid_state.deref().as_ref(),
