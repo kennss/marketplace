@@ -129,6 +129,7 @@ export type BuyLegacySplInstruction<
   TAccountTokenMetadataProgram extends string | IAccountMeta<string> = string,
   TAccountSysvarInstructions extends string | IAccountMeta<string> = string,
   TAccountCosigner extends string | IAccountMeta<string> = string,
+  TAccountCommunityRegistration extends string | IAccountMeta<string> = string,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -223,6 +224,9 @@ export type BuyLegacySplInstruction<
         ? ReadonlySignerAccount<TAccountCosigner> &
             IAccountSignerMeta<TAccountCosigner>
         : TAccountCosigner,
+      TAccountCommunityRegistration extends string
+        ? WritableAccount<TAccountCommunityRegistration>
+        : TAccountCommunityRegistration,
       ...TRemainingAccounts,
     ]
   >;
@@ -316,6 +320,7 @@ export type BuyLegacySplAsyncInput<
   TAccountTokenMetadataProgram extends string = string,
   TAccountSysvarInstructions extends string = string,
   TAccountCosigner extends string = string,
+  TAccountCommunityRegistration extends string = string,
 > = {
   feeVault?: Address<TAccountFeeVault>;
   feeVaultCurrencyTa?: Address<TAccountFeeVaultCurrencyTa>;
@@ -346,6 +351,7 @@ export type BuyLegacySplAsyncInput<
   tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
   sysvarInstructions?: Address<TAccountSysvarInstructions>;
   cosigner?: TransactionSigner<TAccountCosigner>;
+  communityRegistration?: Address<TAccountCommunityRegistration>;
   maxAmount: BuyLegacySplInstructionDataArgs['maxAmount'];
   optionalRoyaltyPct?: BuyLegacySplInstructionDataArgs['optionalRoyaltyPct'];
   authorizationData?: BuyLegacySplInstructionDataArgs['authorizationData'];
@@ -385,6 +391,7 @@ export async function getBuyLegacySplInstructionAsync<
   TAccountTokenMetadataProgram extends string,
   TAccountSysvarInstructions extends string,
   TAccountCosigner extends string,
+  TAccountCommunityRegistration extends string,
   TProgramAddress extends Address = typeof TENSOR_MARKETPLACE_PROGRAM_ADDRESS,
 >(
   input: BuyLegacySplAsyncInput<
@@ -416,7 +423,8 @@ export async function getBuyLegacySplInstructionAsync<
     TAccountAuthorizationRulesProgram,
     TAccountTokenMetadataProgram,
     TAccountSysvarInstructions,
-    TAccountCosigner
+    TAccountCosigner,
+    TAccountCommunityRegistration
   >,
   config?: { programAddress?: TProgramAddress }
 ): Promise<
@@ -450,7 +458,8 @@ export async function getBuyLegacySplInstructionAsync<
     TAccountAuthorizationRulesProgram,
     TAccountTokenMetadataProgram,
     TAccountSysvarInstructions,
-    TAccountCosigner
+    TAccountCosigner,
+    TAccountCommunityRegistration
   >
 > {
   // Program address.
@@ -515,6 +524,10 @@ export async function getBuyLegacySplInstructionAsync<
       isWritable: false,
     },
     cosigner: { value: input.cosigner ?? null, isWritable: false },
+    communityRegistration: {
+      value: input.communityRegistration ?? null,
+      isWritable: true,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -693,6 +706,7 @@ export async function getBuyLegacySplInstructionAsync<
       getAccountMeta(accounts.tokenMetadataProgram),
       getAccountMeta(accounts.sysvarInstructions),
       getAccountMeta(accounts.cosigner),
+      getAccountMeta(accounts.communityRegistration),
       ...remainingAccounts,
     ],
     programAddress,
@@ -729,7 +743,8 @@ export async function getBuyLegacySplInstructionAsync<
     TAccountAuthorizationRulesProgram,
     TAccountTokenMetadataProgram,
     TAccountSysvarInstructions,
-    TAccountCosigner
+    TAccountCosigner,
+    TAccountCommunityRegistration
   >;
 
   return instruction;
@@ -765,6 +780,7 @@ export type BuyLegacySplInput<
   TAccountTokenMetadataProgram extends string = string,
   TAccountSysvarInstructions extends string = string,
   TAccountCosigner extends string = string,
+  TAccountCommunityRegistration extends string = string,
 > = {
   feeVault: Address<TAccountFeeVault>;
   feeVaultCurrencyTa: Address<TAccountFeeVaultCurrencyTa>;
@@ -795,6 +811,7 @@ export type BuyLegacySplInput<
   tokenMetadataProgram?: Address<TAccountTokenMetadataProgram>;
   sysvarInstructions?: Address<TAccountSysvarInstructions>;
   cosigner?: TransactionSigner<TAccountCosigner>;
+  communityRegistration?: Address<TAccountCommunityRegistration>;
   maxAmount: BuyLegacySplInstructionDataArgs['maxAmount'];
   optionalRoyaltyPct?: BuyLegacySplInstructionDataArgs['optionalRoyaltyPct'];
   authorizationData?: BuyLegacySplInstructionDataArgs['authorizationData'];
@@ -834,6 +851,7 @@ export function getBuyLegacySplInstruction<
   TAccountTokenMetadataProgram extends string,
   TAccountSysvarInstructions extends string,
   TAccountCosigner extends string,
+  TAccountCommunityRegistration extends string,
   TProgramAddress extends Address = typeof TENSOR_MARKETPLACE_PROGRAM_ADDRESS,
 >(
   input: BuyLegacySplInput<
@@ -865,7 +883,8 @@ export function getBuyLegacySplInstruction<
     TAccountAuthorizationRulesProgram,
     TAccountTokenMetadataProgram,
     TAccountSysvarInstructions,
-    TAccountCosigner
+    TAccountCosigner,
+    TAccountCommunityRegistration
   >,
   config?: { programAddress?: TProgramAddress }
 ): BuyLegacySplInstruction<
@@ -898,7 +917,8 @@ export function getBuyLegacySplInstruction<
   TAccountAuthorizationRulesProgram,
   TAccountTokenMetadataProgram,
   TAccountSysvarInstructions,
-  TAccountCosigner
+  TAccountCosigner,
+  TAccountCommunityRegistration
 > {
   // Program address.
   const programAddress =
@@ -962,6 +982,10 @@ export function getBuyLegacySplInstruction<
       isWritable: false,
     },
     cosigner: { value: input.cosigner ?? null, isWritable: false },
+    communityRegistration: {
+      value: input.communityRegistration ?? null,
+      isWritable: true,
+    },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -1069,6 +1093,7 @@ export function getBuyLegacySplInstruction<
       getAccountMeta(accounts.tokenMetadataProgram),
       getAccountMeta(accounts.sysvarInstructions),
       getAccountMeta(accounts.cosigner),
+      getAccountMeta(accounts.communityRegistration),
       ...remainingAccounts,
     ],
     programAddress,
@@ -1105,7 +1130,8 @@ export function getBuyLegacySplInstruction<
     TAccountAuthorizationRulesProgram,
     TAccountTokenMetadataProgram,
     TAccountSysvarInstructions,
-    TAccountCosigner
+    TAccountCosigner,
+    TAccountCommunityRegistration
   >;
 
   return instruction;
@@ -1146,6 +1172,7 @@ export type ParsedBuyLegacySplInstruction<
     tokenMetadataProgram?: TAccountMetas[26] | undefined;
     sysvarInstructions?: TAccountMetas[27] | undefined;
     cosigner?: TAccountMetas[28] | undefined;
+    communityRegistration?: TAccountMetas[29] | undefined;
   };
   data: BuyLegacySplInstructionData;
 };
@@ -1158,7 +1185,7 @@ export function parseBuyLegacySplInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedBuyLegacySplInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 29) {
+  if (instruction.accounts.length < 30) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -1206,6 +1233,7 @@ export function parseBuyLegacySplInstruction<
       tokenMetadataProgram: getNextOptionalAccount(),
       sysvarInstructions: getNextOptionalAccount(),
       cosigner: getNextOptionalAccount(),
+      communityRegistration: getNextOptionalAccount(),
     },
     data: getBuyLegacySplInstructionDataDecoder().decode(instruction.data),
   };

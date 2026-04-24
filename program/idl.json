@@ -1313,6 +1313,18 @@
           "isMut": false,
           "isSigner": true,
           "isOptional": true
+        },
+        {
+          "name": "communityRegistration",
+          "isMut": true,
+          "isSigner": false,
+          "isOptional": true
+        },
+        {
+          "name": "leaderWallet",
+          "isMut": true,
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -1491,6 +1503,12 @@
           "name": "cosigner",
           "isMut": false,
           "isSigner": true,
+          "isOptional": true
+        },
+        {
+          "name": "communityRegistration",
+          "isMut": true,
+          "isSigner": false,
           "isOptional": true
         }
       ],
@@ -2062,6 +2080,18 @@
           "name": "rentDestination",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "communityRegistration",
+          "isMut": true,
+          "isSigner": false,
+          "isOptional": true
+        },
+        {
+          "name": "leaderWallet",
+          "isMut": true,
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -3852,9 +3882,250 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "registerCommunityCollection",
+      "docs": [
+        "Register an NFT collection for community fee share. Caller must be",
+        "the metadata `update_authority` and a verified creator."
+      ],
+      "accounts": [
+        {
+          "name": "registration",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Newly initialised PDA. Seed: [b\"community_registration\", collection_mint].",
+            "Leader pays rent."
+          ]
+        },
+        {
+          "name": "collectionMint",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The collection master mint being registered."
+          ]
+        },
+        {
+          "name": "metadata",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Metaplex metadata account for `collection_mint`. Validated by",
+            "`assert_decode_metadata` and seeds-derived from collection_mint."
+          ]
+        },
+        {
+          "name": "leader",
+          "isMut": true,
+          "isSigner": true,
+          "docs": [
+            "Community leader — receives community share, pays rent, signs."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "leaderSnowchatId",
+          "type": {
+            "array": [
+              "u8",
+              36
+            ]
+          }
+        },
+        {
+          "name": "channelId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revokeCommunityCollection",
+      "docs": [
+        "Voluntarily revoke a previously registered community collection.",
+        "Soft-deletes the registration; PDA stays open with cumulative stats",
+        "preserved for audit. Subject to 30-day cooldown from registration."
+      ],
+      "accounts": [
+        {
+          "name": "registration",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "leader",
+          "isMut": false,
+          "isSigner": true,
+          "docs": [
+            "Must match `registration.leader_wallet`."
+          ]
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
+    {
+      "name": "CommunityRegistration",
+      "docs": [
+        "On-chain registration linking an NFT collection to a community leader's",
+        "wallet. The `apply_community_share` fee-split helper consults this PDA",
+        "(passed as an optional account on every Buy/TakeBid instruction) and routes",
+        "half of the platform fee to the leader.",
+        "",
+        "Seed: `[b\"community_registration\", collection_mint]` — one registration",
+        "per collection. Channel↔collection mapping is owned by the off-chain server",
+        "(`community_collection_registrations` table) and is not authoritative for",
+        "fee routing — the on-chain PDA is the sole source of truth."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "docs": [
+              "Schema version. Bump on layout-incompatible changes."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "collectionMint",
+            "docs": [
+              "NFT collection master mint (PDA seed)."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "leaderWallet",
+            "docs": [
+              "Verified leader wallet — recipient of community share. Must match",
+              "`metadata.update_authority` at registration time AND must appear as",
+              "a `verified=true` entry in `metadata.creators[]` on every trade",
+              "(cross-checked in `apply_community_share`)."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "leaderSnowchatId",
+            "docs": [
+              "SnowChat ID snapshot for off-chain audit trail.",
+              "Format: ASCII \"snow\" + 32 hex chars = 36 bytes."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                36
+              ]
+            }
+          },
+          {
+            "name": "channelId",
+            "docs": [
+              "SnowChat channel id snapshot (off-chain index helper). Server side",
+              "enforces 1 collection per channel via DB unique constraint; on-chain",
+              "only stores for emit/audit."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "metadataHash",
+            "docs": [
+              "SHA-256 hash of the metadata account at registration time. Re-checked",
+              "on every trade to detect post-registration mutation",
+              "(Agent A P1-3 / Agent B P1 S-3 — metadata mutation attack)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "registeredAt",
+            "docs": [
+              "unix timestamp."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "revokedAt",
+            "docs": [
+              "None = active. Some(ts) = revoked at ts. Soft delete preserves",
+              "cumulative stats + audit trail."
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "revokedReason",
+            "docs": [
+              "Reason code for revocation. Enum variants:",
+              "0 = user_request",
+              "1 = metadata_mismatch (auto-suspended on hash mismatch)",
+              "2 = admin_action",
+              "3 = cooldown_violation",
+              "4 = update_authority_changed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "cumulativeShareLamports",
+            "docs": [
+              "Lamports of community share routed cumulative. Atomic increment on",
+              "every successful Buy/TakeBid. Source of truth for off-chain dashboard",
+              "+ monthly settlement (Agent A P1-5)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tradeCount",
+            "docs": [
+              "Number of trades that routed share to this registration."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Reserved for forward compatibility (e.g. tier-based split ratios,",
+              "per-currency cumulative tracking). Zero-filled at init."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "ListState",
       "type": {
@@ -4594,6 +4865,63 @@
       }
     }
   ],
+  "events": [
+    {
+      "name": "CommunityRegisteredEvent",
+      "fields": [
+        {
+          "name": "collectionMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "leader",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "registeredAt",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CommunityRevokedEvent",
+      "fields": [
+        {
+          "name": "collectionMint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "leader",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "revokedAt",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "cumulativeShareLamports",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "tradeCount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "reason",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    }
+  ],
   "errors": [
     {
       "code": 6100,
@@ -4839,12 +5167,66 @@
       "code": 6148,
       "name": "InvalidMint",
       "msg": "Invalid mint"
+    },
+    {
+      "code": 6200,
+      "name": "CommunityUpdateAuthorityMismatch",
+      "msg": "update authority does not match leader signer"
+    },
+    {
+      "code": 6201,
+      "name": "CommunityNoCreators",
+      "msg": "NFT metadata has no creators"
+    },
+    {
+      "code": 6202,
+      "name": "CommunityLeaderNotVerified",
+      "msg": "leader is not a verified creator on the metadata"
+    },
+    {
+      "code": 6203,
+      "name": "CommunityCooldownActive",
+      "msg": "registration cooldown still active (30 days)"
+    },
+    {
+      "code": 6204,
+      "name": "CommunityAlreadyRevoked",
+      "msg": "registration already revoked"
+    },
+    {
+      "code": 6205,
+      "name": "CommunityRegistrationRevoked",
+      "msg": "registration is revoked"
+    },
+    {
+      "code": 6206,
+      "name": "CommunityCollectionMismatch",
+      "msg": "collection mint mismatch between registration and listing"
+    },
+    {
+      "code": 6207,
+      "name": "CommunityLeaderAccountMissing",
+      "msg": "leader wallet account is required when community registration provided"
+    },
+    {
+      "code": 6208,
+      "name": "CommunityLeaderMismatch",
+      "msg": "leader wallet does not match registration"
+    },
+    {
+      "code": 6209,
+      "name": "CommunityMetadataHashMismatch",
+      "msg": "metadata hash mismatch — collection updated since registration"
+    },
+    {
+      "code": 6210,
+      "name": "CommunityNoCollection",
+      "msg": "NFT metadata has no collection link"
+    },
+    {
+      "code": 6211,
+      "name": "CommunityWrongVersion",
+      "msg": "schema version mismatch on community registration"
     }
-  ],
-  "metadata": {
-    "address": "TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp",
-    "origin": "anchor",
-    "binaryVersion": "0.29.0",
-    "libVersion": "0.29.0"
-  }
+  ]
 }

@@ -68,6 +68,8 @@ pub struct BuyLegacySpl {
     pub sysvar_instructions: Option<solana_program::pubkey::Pubkey>,
 
     pub cosigner: Option<solana_program::pubkey::Pubkey>,
+
+    pub community_registration: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl BuyLegacySpl {
@@ -83,7 +85,7 @@ impl BuyLegacySpl {
         args: BuyLegacySplInstructionArgs,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(29 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(30 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
             self.fee_vault,
             false,
@@ -258,6 +260,17 @@ impl BuyLegacySpl {
                 false,
             ));
         }
+        if let Some(community_registration) = self.community_registration {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                community_registration,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
         accounts.extend_from_slice(remaining_accounts);
         let mut data = BuyLegacySplInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
@@ -331,6 +344,7 @@ pub struct BuyLegacySplInstructionArgs {
 ///   26. `[optional]` token_metadata_program
 ///   27. `[optional]` sysvar_instructions
 ///   28. `[signer, optional]` cosigner
+///   29. `[writable, optional]` community_registration
 #[derive(Clone, Debug, Default)]
 pub struct BuyLegacySplBuilder {
     fee_vault: Option<solana_program::pubkey::Pubkey>,
@@ -362,6 +376,7 @@ pub struct BuyLegacySplBuilder {
     token_metadata_program: Option<solana_program::pubkey::Pubkey>,
     sysvar_instructions: Option<solana_program::pubkey::Pubkey>,
     cosigner: Option<solana_program::pubkey::Pubkey>,
+    community_registration: Option<solana_program::pubkey::Pubkey>,
     max_amount: Option<u64>,
     optional_royalty_pct: Option<u16>,
     authorization_data: Option<AuthorizationDataLocal>,
@@ -575,6 +590,15 @@ impl BuyLegacySplBuilder {
         self.cosigner = cosigner;
         self
     }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn community_registration(
+        &mut self,
+        community_registration: Option<solana_program::pubkey::Pubkey>,
+    ) -> &mut Self {
+        self.community_registration = community_registration;
+        self
+    }
     #[inline(always)]
     pub fn max_amount(&mut self, max_amount: u64) -> &mut Self {
         self.max_amount = Some(max_amount);
@@ -658,6 +682,7 @@ impl BuyLegacySplBuilder {
             token_metadata_program: self.token_metadata_program,
             sysvar_instructions: self.sysvar_instructions,
             cosigner: self.cosigner,
+            community_registration: self.community_registration,
         };
         let args = BuyLegacySplInstructionArgs {
             max_amount: self.max_amount.clone().expect("max_amount is not set"),
@@ -728,6 +753,8 @@ pub struct BuyLegacySplCpiAccounts<'a, 'b> {
     pub sysvar_instructions: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 
     pub cosigner: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+
+    pub community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
 /// `buy_legacy_spl` CPI instruction.
@@ -792,6 +819,8 @@ pub struct BuyLegacySplCpi<'a, 'b> {
     pub sysvar_instructions: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 
     pub cosigner: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+
+    pub community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: BuyLegacySplInstructionArgs,
 }
@@ -833,6 +862,7 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
             token_metadata_program: accounts.token_metadata_program,
             sysvar_instructions: accounts.sysvar_instructions,
             cosigner: accounts.cosigner,
+            community_registration: accounts.community_registration,
             __args: args,
         }
     }
@@ -869,7 +899,7 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(29 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(30 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
             *self.fee_vault.key,
             false,
@@ -1049,6 +1079,17 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
                 false,
             ));
         }
+        if let Some(community_registration) = self.community_registration {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                *community_registration.key,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
@@ -1065,7 +1106,7 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(29 + 1 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(30 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.fee_vault.clone());
         account_infos.push(self.fee_vault_currency_ta.clone());
@@ -1114,6 +1155,9 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
         if let Some(cosigner) = self.cosigner {
             account_infos.push(cosigner.clone());
         }
+        if let Some(community_registration) = self.community_registration {
+            account_infos.push(community_registration.clone());
+        }
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -1159,6 +1203,7 @@ impl<'a, 'b> BuyLegacySplCpi<'a, 'b> {
 ///   26. `[optional]` token_metadata_program
 ///   27. `[optional]` sysvar_instructions
 ///   28. `[signer, optional]` cosigner
+///   29. `[writable, optional]` community_registration
 #[derive(Clone, Debug)]
 pub struct BuyLegacySplCpiBuilder<'a, 'b> {
     instruction: Box<BuyLegacySplCpiBuilderInstruction<'a, 'b>>,
@@ -1197,6 +1242,7 @@ impl<'a, 'b> BuyLegacySplCpiBuilder<'a, 'b> {
             token_metadata_program: None,
             sysvar_instructions: None,
             cosigner: None,
+            community_registration: None,
             max_amount: None,
             optional_royalty_pct: None,
             authorization_data: None,
@@ -1433,6 +1479,15 @@ impl<'a, 'b> BuyLegacySplCpiBuilder<'a, 'b> {
         self.instruction.cosigner = cosigner;
         self
     }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn community_registration(
+        &mut self,
+        community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    ) -> &mut Self {
+        self.instruction.community_registration = community_registration;
+        self
+    }
     #[inline(always)]
     pub fn max_amount(&mut self, max_amount: u64) -> &mut Self {
         self.instruction.max_amount = Some(max_amount);
@@ -1587,6 +1642,8 @@ impl<'a, 'b> BuyLegacySplCpiBuilder<'a, 'b> {
             sysvar_instructions: self.instruction.sysvar_instructions,
 
             cosigner: self.instruction.cosigner,
+
+            community_registration: self.instruction.community_registration,
             __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -1628,6 +1685,7 @@ struct BuyLegacySplCpiBuilderInstruction<'a, 'b> {
     token_metadata_program: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     sysvar_instructions: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     cosigner: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     max_amount: Option<u64>,
     optional_royalty_pct: Option<u16>,
     authorization_data: Option<AuthorizationDataLocal>,

@@ -14,23 +14,20 @@ import {
   type ProgramDerivedAddress,
 } from '@solana/web3.js';
 
-export type BidStateSeeds = {
-  owner: Address;
-
-  bidId: Address;
+export type CommunityRegistrationSeeds = {
+  collectionMint: Address;
 };
 
-export async function findBidStatePda(
-  seeds: BidStateSeeds,
+export async function findCommunityRegistrationPda(
+  seeds: CommunityRegistrationSeeds,
   config: { programAddress?: Address | undefined } = {}
 ): Promise<ProgramDerivedAddress> {
   const { programAddress = '' as Address<''> } = config;
   return await getProgramDerivedAddress({
     programAddress,
     seeds: [
-      getUtf8Encoder().encode('bid_state'),
-      getAddressEncoder().encode(seeds.owner),
-      getAddressEncoder().encode(seeds.bidId),
+      getUtf8Encoder().encode('community_registration'),
+      getAddressEncoder().encode(seeds.collectionMint),
     ],
   });
 }

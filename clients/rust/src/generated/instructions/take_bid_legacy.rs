@@ -68,6 +68,10 @@ pub struct TakeBidLegacy {
     pub mint_proof: Option<solana_program::pubkey::Pubkey>,
 
     pub rent_destination: solana_program::pubkey::Pubkey,
+
+    pub community_registration: Option<solana_program::pubkey::Pubkey>,
+
+    pub leader_wallet: Option<solana_program::pubkey::Pubkey>,
 }
 
 impl TakeBidLegacy {
@@ -83,7 +87,7 @@ impl TakeBidLegacy {
         args: TakeBidLegacyInstructionArgs,
         remaining_accounts: &[solana_program::instruction::AccountMeta],
     ) -> solana_program::instruction::Instruction {
-        let mut accounts = Vec::with_capacity(29 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(31 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
             self.fee_vault,
             false,
@@ -279,6 +283,28 @@ impl TakeBidLegacy {
             self.rent_destination,
             false,
         ));
+        if let Some(community_registration) = self.community_registration {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                community_registration,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
+        if let Some(leader_wallet) = self.leader_wallet {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                leader_wallet,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
         accounts.extend_from_slice(remaining_accounts);
         let mut data = TakeBidLegacyInstructionData::new().try_to_vec().unwrap();
         let mut args = args.try_to_vec().unwrap();
@@ -353,6 +379,8 @@ pub struct TakeBidLegacyInstructionArgs {
 ///   26. `[signer, optional]` cosigner
 ///   27. `[optional]` mint_proof
 ///   28. `[writable]` rent_destination
+///   29. `[writable, optional]` community_registration
+///   30. `[writable, optional]` leader_wallet
 #[derive(Clone, Debug, Default)]
 pub struct TakeBidLegacyBuilder {
     fee_vault: Option<solana_program::pubkey::Pubkey>,
@@ -384,6 +412,8 @@ pub struct TakeBidLegacyBuilder {
     cosigner: Option<solana_program::pubkey::Pubkey>,
     mint_proof: Option<solana_program::pubkey::Pubkey>,
     rent_destination: Option<solana_program::pubkey::Pubkey>,
+    community_registration: Option<solana_program::pubkey::Pubkey>,
+    leader_wallet: Option<solana_program::pubkey::Pubkey>,
     min_amount: Option<u64>,
     optional_royalty_pct: Option<u16>,
     rules_acc_present: Option<bool>,
@@ -595,6 +625,24 @@ impl TakeBidLegacyBuilder {
         self.rent_destination = Some(rent_destination);
         self
     }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn community_registration(
+        &mut self,
+        community_registration: Option<solana_program::pubkey::Pubkey>,
+    ) -> &mut Self {
+        self.community_registration = community_registration;
+        self
+    }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn leader_wallet(
+        &mut self,
+        leader_wallet: Option<solana_program::pubkey::Pubkey>,
+    ) -> &mut Self {
+        self.leader_wallet = leader_wallet;
+        self
+    }
     #[inline(always)]
     pub fn min_amount(&mut self, min_amount: u64) -> &mut Self {
         self.min_amount = Some(min_amount);
@@ -678,6 +726,8 @@ impl TakeBidLegacyBuilder {
             cosigner: self.cosigner,
             mint_proof: self.mint_proof,
             rent_destination: self.rent_destination.expect("rent_destination is not set"),
+            community_registration: self.community_registration,
+            leader_wallet: self.leader_wallet,
         };
         let args = TakeBidLegacyInstructionArgs {
             min_amount: self.min_amount.clone().expect("min_amount is not set"),
@@ -749,6 +799,10 @@ pub struct TakeBidLegacyCpiAccounts<'a, 'b> {
     pub mint_proof: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 
     pub rent_destination: &'b solana_program::account_info::AccountInfo<'a>,
+
+    pub community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+
+    pub leader_wallet: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 }
 
 /// `take_bid_legacy` CPI instruction.
@@ -813,6 +867,10 @@ pub struct TakeBidLegacyCpi<'a, 'b> {
     pub mint_proof: Option<&'b solana_program::account_info::AccountInfo<'a>>,
 
     pub rent_destination: &'b solana_program::account_info::AccountInfo<'a>,
+
+    pub community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+
+    pub leader_wallet: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     /// The arguments for the instruction.
     pub __args: TakeBidLegacyInstructionArgs,
 }
@@ -854,6 +912,8 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
             cosigner: accounts.cosigner,
             mint_proof: accounts.mint_proof,
             rent_destination: accounts.rent_destination,
+            community_registration: accounts.community_registration,
+            leader_wallet: accounts.leader_wallet,
             __args: args,
         }
     }
@@ -890,7 +950,7 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
             bool,
         )],
     ) -> solana_program::entrypoint::ProgramResult {
-        let mut accounts = Vec::with_capacity(29 + remaining_accounts.len());
+        let mut accounts = Vec::with_capacity(31 + remaining_accounts.len());
         accounts.push(solana_program::instruction::AccountMeta::new(
             *self.fee_vault.key,
             false,
@@ -1091,6 +1151,28 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
             *self.rent_destination.key,
             false,
         ));
+        if let Some(community_registration) = self.community_registration {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                *community_registration.key,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
+        if let Some(leader_wallet) = self.leader_wallet {
+            accounts.push(solana_program::instruction::AccountMeta::new(
+                *leader_wallet.key,
+                false,
+            ));
+        } else {
+            accounts.push(solana_program::instruction::AccountMeta::new_readonly(
+                crate::TENSOR_MARKETPLACE_ID,
+                false,
+            ));
+        }
         remaining_accounts.iter().for_each(|remaining_account| {
             accounts.push(solana_program::instruction::AccountMeta {
                 pubkey: *remaining_account.0.key,
@@ -1107,7 +1189,7 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
             accounts,
             data,
         };
-        let mut account_infos = Vec::with_capacity(29 + 1 + remaining_accounts.len());
+        let mut account_infos = Vec::with_capacity(31 + 1 + remaining_accounts.len());
         account_infos.push(self.__program.clone());
         account_infos.push(self.fee_vault.clone());
         account_infos.push(self.seller.clone());
@@ -1162,6 +1244,12 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
             account_infos.push(mint_proof.clone());
         }
         account_infos.push(self.rent_destination.clone());
+        if let Some(community_registration) = self.community_registration {
+            account_infos.push(community_registration.clone());
+        }
+        if let Some(leader_wallet) = self.leader_wallet {
+            account_infos.push(leader_wallet.clone());
+        }
         remaining_accounts
             .iter()
             .for_each(|remaining_account| account_infos.push(remaining_account.0.clone()));
@@ -1207,6 +1295,8 @@ impl<'a, 'b> TakeBidLegacyCpi<'a, 'b> {
 ///   26. `[signer, optional]` cosigner
 ///   27. `[optional]` mint_proof
 ///   28. `[writable]` rent_destination
+///   29. `[writable, optional]` community_registration
+///   30. `[writable, optional]` leader_wallet
 #[derive(Clone, Debug)]
 pub struct TakeBidLegacyCpiBuilder<'a, 'b> {
     instruction: Box<TakeBidLegacyCpiBuilderInstruction<'a, 'b>>,
@@ -1245,6 +1335,8 @@ impl<'a, 'b> TakeBidLegacyCpiBuilder<'a, 'b> {
             cosigner: None,
             mint_proof: None,
             rent_destination: None,
+            community_registration: None,
+            leader_wallet: None,
             min_amount: None,
             optional_royalty_pct: None,
             rules_acc_present: None,
@@ -1493,6 +1585,24 @@ impl<'a, 'b> TakeBidLegacyCpiBuilder<'a, 'b> {
         self.instruction.rent_destination = Some(rent_destination);
         self
     }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn community_registration(
+        &mut self,
+        community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    ) -> &mut Self {
+        self.instruction.community_registration = community_registration;
+        self
+    }
+    /// `[optional account]`
+    #[inline(always)]
+    pub fn leader_wallet(
+        &mut self,
+        leader_wallet: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    ) -> &mut Self {
+        self.instruction.leader_wallet = leader_wallet;
+        self
+    }
     #[inline(always)]
     pub fn min_amount(&mut self, min_amount: u64) -> &mut Self {
         self.instruction.min_amount = Some(min_amount);
@@ -1648,6 +1758,10 @@ impl<'a, 'b> TakeBidLegacyCpiBuilder<'a, 'b> {
                 .instruction
                 .rent_destination
                 .expect("rent_destination is not set"),
+
+            community_registration: self.instruction.community_registration,
+
+            leader_wallet: self.instruction.leader_wallet,
             __args: args,
         };
         instruction.invoke_signed_with_remaining_accounts(
@@ -1689,6 +1803,8 @@ struct TakeBidLegacyCpiBuilderInstruction<'a, 'b> {
     cosigner: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     mint_proof: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     rent_destination: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    community_registration: Option<&'b solana_program::account_info::AccountInfo<'a>>,
+    leader_wallet: Option<&'b solana_program::account_info::AccountInfo<'a>>,
     min_amount: Option<u64>,
     optional_royalty_pct: Option<u16>,
     rules_acc_present: Option<bool>,

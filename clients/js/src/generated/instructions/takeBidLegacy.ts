@@ -130,6 +130,8 @@ export type TakeBidLegacyInstruction<
   TAccountCosigner extends string | IAccountMeta<string> = string,
   TAccountMintProof extends string | IAccountMeta<string> = string,
   TAccountRentDestination extends string | IAccountMeta<string> = string,
+  TAccountCommunityRegistration extends string | IAccountMeta<string> = string,
+  TAccountLeaderWallet extends string | IAccountMeta<string> = string,
   TRemainingAccounts extends readonly IAccountMeta<string>[] = [],
 > = IInstruction<TProgram> &
   IInstructionWithData<Uint8Array> &
@@ -224,6 +226,12 @@ export type TakeBidLegacyInstruction<
       TAccountRentDestination extends string
         ? WritableAccount<TAccountRentDestination>
         : TAccountRentDestination,
+      TAccountCommunityRegistration extends string
+        ? WritableAccount<TAccountCommunityRegistration>
+        : TAccountCommunityRegistration,
+      TAccountLeaderWallet extends string
+        ? WritableAccount<TAccountLeaderWallet>
+        : TAccountLeaderWallet,
       ...TRemainingAccounts,
     ]
   >;
@@ -319,6 +327,8 @@ export type TakeBidLegacyAsyncInput<
   TAccountCosigner extends string = string,
   TAccountMintProof extends string = string,
   TAccountRentDestination extends string = string,
+  TAccountCommunityRegistration extends string = string,
+  TAccountLeaderWallet extends string = string,
 > = {
   feeVault?: Address<TAccountFeeVault>;
   seller: TransactionSigner<TAccountSeller>;
@@ -351,6 +361,8 @@ export type TakeBidLegacyAsyncInput<
   /** intentionally not deserializing, it would be dummy in the case of VOC/FVC based verification */
   mintProof?: Address<TAccountMintProof>;
   rentDestination?: Address<TAccountRentDestination>;
+  communityRegistration?: Address<TAccountCommunityRegistration>;
+  leaderWallet?: Address<TAccountLeaderWallet>;
   minAmount: TakeBidLegacyInstructionDataArgs['minAmount'];
   optionalRoyaltyPct?: TakeBidLegacyInstructionDataArgs['optionalRoyaltyPct'];
   rulesAccPresent?: TakeBidLegacyInstructionDataArgs['rulesAccPresent'];
@@ -389,6 +401,8 @@ export async function getTakeBidLegacyInstructionAsync<
   TAccountCosigner extends string,
   TAccountMintProof extends string,
   TAccountRentDestination extends string,
+  TAccountCommunityRegistration extends string,
+  TAccountLeaderWallet extends string,
   TProgramAddress extends Address = typeof TENSOR_MARKETPLACE_PROGRAM_ADDRESS,
 >(
   input: TakeBidLegacyAsyncInput<
@@ -420,7 +434,9 @@ export async function getTakeBidLegacyInstructionAsync<
     TAccountEscrowProgram,
     TAccountCosigner,
     TAccountMintProof,
-    TAccountRentDestination
+    TAccountRentDestination,
+    TAccountCommunityRegistration,
+    TAccountLeaderWallet
   >,
   config?: { programAddress?: TProgramAddress }
 ): Promise<
@@ -454,7 +470,9 @@ export async function getTakeBidLegacyInstructionAsync<
     TAccountEscrowProgram,
     TAccountCosigner,
     TAccountMintProof,
-    TAccountRentDestination
+    TAccountRentDestination,
+    TAccountCommunityRegistration,
+    TAccountLeaderWallet
   >
 > {
   // Program address.
@@ -516,6 +534,11 @@ export async function getTakeBidLegacyInstructionAsync<
     cosigner: { value: input.cosigner ?? null, isWritable: false },
     mintProof: { value: input.mintProof ?? null, isWritable: false },
     rentDestination: { value: input.rentDestination ?? null, isWritable: true },
+    communityRegistration: {
+      value: input.communityRegistration ?? null,
+      isWritable: true,
+    },
+    leaderWallet: { value: input.leaderWallet ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -677,6 +700,8 @@ export async function getTakeBidLegacyInstructionAsync<
       getAccountMeta(accounts.cosigner),
       getAccountMeta(accounts.mintProof),
       getAccountMeta(accounts.rentDestination),
+      getAccountMeta(accounts.communityRegistration),
+      getAccountMeta(accounts.leaderWallet),
       ...remainingAccounts,
     ],
     programAddress,
@@ -713,7 +738,9 @@ export async function getTakeBidLegacyInstructionAsync<
     TAccountEscrowProgram,
     TAccountCosigner,
     TAccountMintProof,
-    TAccountRentDestination
+    TAccountRentDestination,
+    TAccountCommunityRegistration,
+    TAccountLeaderWallet
   >;
 
   return instruction;
@@ -749,6 +776,8 @@ export type TakeBidLegacyInput<
   TAccountCosigner extends string = string,
   TAccountMintProof extends string = string,
   TAccountRentDestination extends string = string,
+  TAccountCommunityRegistration extends string = string,
+  TAccountLeaderWallet extends string = string,
 > = {
   feeVault: Address<TAccountFeeVault>;
   seller: TransactionSigner<TAccountSeller>;
@@ -781,6 +810,8 @@ export type TakeBidLegacyInput<
   /** intentionally not deserializing, it would be dummy in the case of VOC/FVC based verification */
   mintProof?: Address<TAccountMintProof>;
   rentDestination?: Address<TAccountRentDestination>;
+  communityRegistration?: Address<TAccountCommunityRegistration>;
+  leaderWallet?: Address<TAccountLeaderWallet>;
   minAmount: TakeBidLegacyInstructionDataArgs['minAmount'];
   optionalRoyaltyPct?: TakeBidLegacyInstructionDataArgs['optionalRoyaltyPct'];
   rulesAccPresent?: TakeBidLegacyInstructionDataArgs['rulesAccPresent'];
@@ -819,6 +850,8 @@ export function getTakeBidLegacyInstruction<
   TAccountCosigner extends string,
   TAccountMintProof extends string,
   TAccountRentDestination extends string,
+  TAccountCommunityRegistration extends string,
+  TAccountLeaderWallet extends string,
   TProgramAddress extends Address = typeof TENSOR_MARKETPLACE_PROGRAM_ADDRESS,
 >(
   input: TakeBidLegacyInput<
@@ -850,7 +883,9 @@ export function getTakeBidLegacyInstruction<
     TAccountEscrowProgram,
     TAccountCosigner,
     TAccountMintProof,
-    TAccountRentDestination
+    TAccountRentDestination,
+    TAccountCommunityRegistration,
+    TAccountLeaderWallet
   >,
   config?: { programAddress?: TProgramAddress }
 ): TakeBidLegacyInstruction<
@@ -883,7 +918,9 @@ export function getTakeBidLegacyInstruction<
   TAccountEscrowProgram,
   TAccountCosigner,
   TAccountMintProof,
-  TAccountRentDestination
+  TAccountRentDestination,
+  TAccountCommunityRegistration,
+  TAccountLeaderWallet
 > {
   // Program address.
   const programAddress =
@@ -944,6 +981,11 @@ export function getTakeBidLegacyInstruction<
     cosigner: { value: input.cosigner ?? null, isWritable: false },
     mintProof: { value: input.mintProof ?? null, isWritable: false },
     rentDestination: { value: input.rentDestination ?? null, isWritable: true },
+    communityRegistration: {
+      value: input.communityRegistration ?? null,
+      isWritable: true,
+    },
+    leaderWallet: { value: input.leaderWallet ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -1046,6 +1088,8 @@ export function getTakeBidLegacyInstruction<
       getAccountMeta(accounts.cosigner),
       getAccountMeta(accounts.mintProof),
       getAccountMeta(accounts.rentDestination),
+      getAccountMeta(accounts.communityRegistration),
+      getAccountMeta(accounts.leaderWallet),
       ...remainingAccounts,
     ],
     programAddress,
@@ -1082,7 +1126,9 @@ export function getTakeBidLegacyInstruction<
     TAccountEscrowProgram,
     TAccountCosigner,
     TAccountMintProof,
-    TAccountRentDestination
+    TAccountRentDestination,
+    TAccountCommunityRegistration,
+    TAccountLeaderWallet
   >;
 
   return instruction;
@@ -1125,6 +1171,8 @@ export type ParsedTakeBidLegacyInstruction<
     /** intentionally not deserializing, it would be dummy in the case of VOC/FVC based verification */
     mintProof?: TAccountMetas[27] | undefined;
     rentDestination: TAccountMetas[28];
+    communityRegistration?: TAccountMetas[29] | undefined;
+    leaderWallet?: TAccountMetas[30] | undefined;
   };
   data: TakeBidLegacyInstructionData;
 };
@@ -1137,7 +1185,7 @@ export function parseTakeBidLegacyInstruction<
     IInstructionWithAccounts<TAccountMetas> &
     IInstructionWithData<Uint8Array>
 ): ParsedTakeBidLegacyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 29) {
+  if (instruction.accounts.length < 31) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -1185,6 +1233,8 @@ export function parseTakeBidLegacyInstruction<
       cosigner: getNextOptionalAccount(),
       mintProof: getNextOptionalAccount(),
       rentDestination: getNextAccount(),
+      communityRegistration: getNextOptionalAccount(),
+      leaderWallet: getNextOptionalAccount(),
     },
     data: getTakeBidLegacyInstructionDataDecoder().decode(instruction.data),
   };

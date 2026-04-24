@@ -189,31 +189,23 @@ pub struct BuyLegacySpl<'info> {
     pub cosigner: Option<Signer<'info>>,
 
     // ------------------------------------------- SnowChat Community Fee Share
-    // Optional trio. When community_registration is Some, the protocol fee
-    // is split 50/50 and the leader_share flows to `leader_currency_ta` (the
-    // leader wallet's ATA for the listing currency). Rent for ATA init is
-    // paid by the buyer (payer). When None, behaviour is identical to
-    // upstream Tensor.
+    // When community_registration is Some, the protocol fee is split 50/50
+    // between the platform fee_vault_currency_ta and the community leader's
+    // currency ATA. Anchor's BPF stack limit (4096) would overflow if we
+    // also held leader_wallet + leader_currency_ta in the struct, so those
+    // two accounts are passed via remaining_accounts and validated at
+    // runtime (see `parse_community_remaining` in the handler). Ordering:
+    // first two entries of remaining_accounts when community is active.
     #[account(mut)]
-    pub community_registration: Option<Account<'info, CommunityRegistration>>,
-
-    /// CHECK: validated against community_registration.leader_wallet in handler.
-    pub leader_wallet: Option<UncheckedAccount<'info>>,
-
-    #[account(
-        init_if_needed,
-        payer = payer,
-        associated_token::mint = currency,
-        associated_token::authority = leader_wallet,
-        associated_token::token_program = currency_token_program,
-    )]
-    pub leader_currency_ta: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub community_registration: Option<Box<Account<'info, CommunityRegistration>>>,
     //
     // ----------------------------------------------------- Remaining accounts
-    // 1. creators (1-5)
-    // 2. creators' atas (1-5)
-    // 3. maker_broker_currency_ta (optional)
-    // 4. taker_broker_currency_ta (optional)
+    // 0. leader_wallet           (iff community_registration is Some)
+    // 1. leader_currency_ta      (iff community_registration is Some)
+    // N. creators (1-5)
+    // N+k. creators' atas (1-5)
+    // +1. maker_broker_currency_ta (optional)
+    // +1. taker_broker_currency_ta (optional)
 }
 
 impl<'info> Validate<'info> for BuyLegacySpl<'info> {
@@ -290,9 +282,43 @@ pub fn process_buy_legacy_spl<'info, 'b>(
 
     let remaining_accounts = ctx.remaining_accounts;
 
+    // If community_registration is present we expect leader_wallet +
+    // leader_currency_ta as the first two entries in remaining_accounts.
+    // They are passed out-of-struct to keep BuyLegacySpl within the
+    // BPF 4096-byte stack limit (see struct doc). Creating the ATA if
+    // empty is the buyer's responsibility just as for broker ATAs.
+    let (community_leader_info, community_leader_ta, remaining) =
+        if ctx.accounts.community_registration.is_some() {
+            let (leader_info, rest) = remaining_accounts
+                .split_first()
+                .ok_or(TcompError::InsufficientRemainingAccounts)?;
+            let (leader_ta, rest) = rest
+                .split_first()
+                .ok_or(TcompError::InsufficientRemainingAccounts)?;
+
+            if leader_ta.data_is_empty() {
+                anchor_spl::associated_token::create(CpiContext::new(
+                    ctx.accounts.associated_token_program.to_account_info(),
+                    anchor_spl::associated_token::Create {
+                        payer: ctx.accounts.payer.to_account_info(),
+                        associated_token: leader_ta.to_account_info(),
+                        authority: leader_info.to_account_info(),
+                        mint: ctx.accounts.currency.to_account_info(),
+                        system_program: ctx.accounts.system_program.to_account_info(),
+                        token_program: ctx.accounts.currency_token_program.to_account_info(),
+                    },
+                ))?;
+            }
+            assert_decode_token_account(&currency, &leader_info.key(), leader_ta)?;
+
+            (Some(leader_info.clone()), Some(leader_ta), rest)
+        } else {
+            (None, None, remaining_accounts)
+        };
+
     // Parse remaining accounts.
     let num_creators = metadata.creators.as_ref().map(Vec::len).unwrap_or(0);
-    let (creator_accounts, remaining) = remaining_accounts.split_at(num_creators);
+    let (creator_accounts, remaining) = remaining.split_at(num_creators);
     let (creator_ta_accounts, remaining) = remaining.split_at(num_creators);
 
     // If broker acounts are present, we need the currency token accounts from them.
@@ -452,8 +478,8 @@ pub fn process_buy_legacy_spl<'info, 'b>(
         tcomp_fee,
         &metadata,
         &ctx.accounts.metadata.to_account_info(),
-        ctx.accounts.community_registration.as_ref(),
-        ctx.accounts.leader_wallet.as_ref(),
+        ctx.accounts.community_registration.as_deref(),
+        community_leader_info,
     )?;
 
     ctx.accounts.transfer_currency(
@@ -462,17 +488,14 @@ pub fn process_buy_legacy_spl<'info, 'b>(
     )?;
 
     if community_split.leader_share > 0 {
-        let leader_ta = ctx
-            .accounts
-            .leader_currency_ta
-            .as_ref()
+        let leader_ta = community_leader_ta
             .ok_or_else(|| error!(TcompError::CommunityLeaderAccountMissing))?;
         ctx.accounts.transfer_currency(
             &leader_ta.to_account_info(),
             community_split.leader_share,
         )?;
         record_share_distribution(
-            ctx.accounts.community_registration.as_mut().unwrap(),
+            ctx.accounts.community_registration.as_deref_mut().unwrap(),
             community_split.leader_share,
         )?;
     }

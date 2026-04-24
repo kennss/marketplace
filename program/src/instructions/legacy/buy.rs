@@ -159,7 +159,7 @@ pub struct BuyLegacy<'info> {
     // and `leader_wallet` (community leader), validated cross-checks against
     // metadata.creators[] and metadata hash.
     #[account(mut)]
-    pub community_registration: Option<Account<'info, CommunityRegistration>>,
+    pub community_registration: Option<Box<Account<'info, CommunityRegistration>>>,
 
     /// CHECK: validated against community_registration.leader_wallet in handler.
     #[account(mut)]
@@ -313,8 +313,8 @@ pub fn process_buy_legacy<'info, 'b>(
         tcomp_fee,
         &metadata,
         &ctx.accounts.metadata.to_account_info(),
-        ctx.accounts.community_registration.as_ref(),
-        ctx.accounts.leader_wallet.as_ref(),
+        ctx.accounts.community_registration.as_deref(),
+        ctx.accounts.leader_wallet.as_ref().map(|a| a.to_account_info()),
     )?;
 
     transfer_lamports(
@@ -326,7 +326,7 @@ pub fn process_buy_legacy<'info, 'b>(
     if let Some(leader_info) = community_split.leader_account.as_ref() {
         transfer_lamports(&ctx.accounts.payer, leader_info, community_split.leader_share)?;
         record_share_distribution(
-            ctx.accounts.community_registration.as_mut().unwrap(),
+            ctx.accounts.community_registration.as_deref_mut().unwrap(),
             community_split.leader_share,
         )?;
     }

@@ -112,6 +112,30 @@ export const TENSOR_MARKETPLACE_ERROR__MISSING_WHITELIST_METHOD = 0x1802; // 614
 export const TENSOR_MARKETPLACE_ERROR__EDITION_DATA_EMPTY = 0x1803; // 6147
 /** InvalidMint: Invalid mint */
 export const TENSOR_MARKETPLACE_ERROR__INVALID_MINT = 0x1804; // 6148
+/** CommunityUpdateAuthorityMismatch: update authority does not match leader signer */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_UPDATE_AUTHORITY_MISMATCH = 0x1838; // 6200
+/** CommunityNoCreators: NFT metadata has no creators */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_CREATORS = 0x1839; // 6201
+/** CommunityLeaderNotVerified: leader is not a verified creator on the metadata */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_VERIFIED = 0x183a; // 6202
+/** CommunityCooldownActive: registration cooldown still active (30 days) */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_COOLDOWN_ACTIVE = 0x183b; // 6203
+/** CommunityAlreadyRevoked: registration already revoked */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_ALREADY_REVOKED = 0x183c; // 6204
+/** CommunityRegistrationRevoked: registration is revoked */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_REGISTRATION_REVOKED = 0x183d; // 6205
+/** CommunityCollectionMismatch: collection mint mismatch between registration and listing */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_MISMATCH = 0x183e; // 6206
+/** CommunityLeaderAccountMissing: leader wallet account is required when community registration provided */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_ACCOUNT_MISSING = 0x183f; // 6207
+/** CommunityLeaderMismatch: leader wallet does not match registration */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_MISMATCH = 0x1840; // 6208
+/** CommunityMetadataHashMismatch: metadata hash mismatch — collection updated since registration */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH = 0x1841; // 6209
+/** CommunityNoCollection: NFT metadata has no collection link */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION = 0x1842; // 6210
+/** CommunityWrongVersion: schema version mismatch on community registration */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_WRONG_VERSION = 0x1843; // 6211
 
 export type TensorMarketplaceError =
   | typeof TENSOR_MARKETPLACE_ERROR__ARITHMETIC_ERROR
@@ -132,6 +156,18 @@ export type TensorMarketplaceError =
   | typeof TENSOR_MARKETPLACE_ERROR__BID_NOT_YET_EXPIRED
   | typeof TENSOR_MARKETPLACE_ERROR__BROKER_MISMATCH
   | typeof TENSOR_MARKETPLACE_ERROR__CANNOT_MODIFY_TARGET
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_ALREADY_REVOKED
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_COOLDOWN_ACTIVE
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_ACCOUNT_MISSING
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_VERIFIED
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_CREATORS
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_REGISTRATION_REVOKED
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_UPDATE_AUTHORITY_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_WRONG_VERSION
   | typeof TENSOR_MARKETPLACE_ERROR__CREATOR_MISMATCH
   | typeof TENSOR_MARKETPLACE_ERROR__CURRENCY_MISMATCH
   | typeof TENSOR_MARKETPLACE_ERROR__CURRENCY_NOT_YET_ENABLED
@@ -187,6 +223,18 @@ if (process.env.NODE_ENV !== 'production') {
     [TENSOR_MARKETPLACE_ERROR__BID_NOT_YET_EXPIRED]: `bid not yet expired`,
     [TENSOR_MARKETPLACE_ERROR__BROKER_MISMATCH]: `broker mismatch`,
     [TENSOR_MARKETPLACE_ERROR__CANNOT_MODIFY_TARGET]: `cannot modify bid target, create a new bid`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_ALREADY_REVOKED]: `registration already revoked`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_MISMATCH]: `collection mint mismatch between registration and listing`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_COOLDOWN_ACTIVE]: `registration cooldown still active (30 days)`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_ACCOUNT_MISSING]: `leader wallet account is required when community registration provided`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_MISMATCH]: `leader wallet does not match registration`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_VERIFIED]: `leader is not a verified creator on the metadata`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH]: `metadata hash mismatch — collection updated since registration`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION]: `NFT metadata has no collection link`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_CREATORS]: `NFT metadata has no creators`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_REGISTRATION_REVOKED]: `registration is revoked`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_UPDATE_AUTHORITY_MISMATCH]: `update authority does not match leader signer`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_WRONG_VERSION]: `schema version mismatch on community registration`,
     [TENSOR_MARKETPLACE_ERROR__CREATOR_MISMATCH]: `creator mismatch`,
     [TENSOR_MARKETPLACE_ERROR__CURRENCY_MISMATCH]: `Currency mismatch`,
     [TENSOR_MARKETPLACE_ERROR__CURRENCY_NOT_YET_ENABLED]: `currency not yet enabled`,

@@ -43,6 +43,8 @@ import {
   type ParsedListLegacyInstruction,
   type ParsedListT22Instruction,
   type ParsedListWnsInstruction,
+  type ParsedRegisterCommunityCollectionInstruction,
+  type ParsedRevokeCommunityCollectionInstruction,
   type ParsedTakeBidCompressedFullMetaInstruction,
   type ParsedTakeBidCompressedMetaHashInstruction,
   type ParsedTakeBidCoreInstruction,
@@ -52,10 +54,10 @@ import {
   type ParsedTcompNoopInstruction,
 } from '../instructions';
 
-export const TENSOR_MARKETPLACE_PROGRAM_ADDRESS =
-  'TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp' as Address<'TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp'>;
+export const TENSOR_MARKETPLACE_PROGRAM_ADDRESS = '' as Address<''>;
 
 export enum TensorMarketplaceAccount {
+  CommunityRegistration,
   ListState,
   AssetListState,
   BidState,
@@ -66,6 +68,17 @@ export function identifyTensorMarketplaceAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): TensorMarketplaceAccount {
   const data = 'data' in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([236, 180, 10, 39, 116, 172, 226, 118])
+      ),
+      0
+    )
+  ) {
+    return TensorMarketplaceAccount.CommunityRegistration;
+  }
   if (
     containsBytes(
       data,
@@ -152,6 +165,8 @@ export enum TensorMarketplaceInstruction {
   DelistCore,
   ListCore,
   TakeBidCore,
+  RegisterCommunityCollection,
+  RevokeCommunityCollection,
 }
 
 export function identifyTensorMarketplaceInstruction(
@@ -554,14 +569,34 @@ export function identifyTensorMarketplaceInstruction(
   ) {
     return TensorMarketplaceInstruction.TakeBidCore;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([250, 58, 139, 204, 162, 147, 82, 44])
+      ),
+      0
+    )
+  ) {
+    return TensorMarketplaceInstruction.RegisterCommunityCollection;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([183, 235, 152, 95, 37, 136, 110, 172])
+      ),
+      0
+    )
+  ) {
+    return TensorMarketplaceInstruction.RevokeCommunityCollection;
+  }
   throw new Error(
     'The provided instruction could not be identified as a tensorMarketplace instruction.'
   );
 }
 
-export type ParsedTensorMarketplaceInstruction<
-  TProgram extends string = 'TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp',
-> =
+export type ParsedTensorMarketplaceInstruction<TProgram extends string = ''> =
   | ({
       instructionType: TensorMarketplaceInstruction.TcompNoop;
     } & ParsedTcompNoopInstruction<TProgram>)
@@ -669,4 +704,10 @@ export type ParsedTensorMarketplaceInstruction<
     } & ParsedListCoreInstruction<TProgram>)
   | ({
       instructionType: TensorMarketplaceInstruction.TakeBidCore;
-    } & ParsedTakeBidCoreInstruction<TProgram>);
+    } & ParsedTakeBidCoreInstruction<TProgram>)
+  | ({
+      instructionType: TensorMarketplaceInstruction.RegisterCommunityCollection;
+    } & ParsedRegisterCommunityCollectionInstruction<TProgram>)
+  | ({
+      instructionType: TensorMarketplaceInstruction.RevokeCommunityCollection;
+    } & ParsedRevokeCommunityCollectionInstruction<TProgram>);

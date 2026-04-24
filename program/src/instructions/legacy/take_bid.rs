@@ -164,7 +164,7 @@ pub struct TakeBidLegacy<'info> {
 
     // ---------------------------- SnowChat Community Fee Share (optional)
     #[account(mut)]
-    pub community_registration: Option<Account<'info, crate::CommunityRegistration>>,
+    pub community_registration: Option<Box<Account<'info, crate::CommunityRegistration>>>,
 
     /// CHECK: validated against community_registration.leader_wallet in handler.
     #[account(mut)]
@@ -401,8 +401,8 @@ pub fn process_take_bid_legacy<'info>(
             tcomp_fee,
             &metadata,
             &ctx.accounts.metadata.to_account_info(),
-            ctx.accounts.community_registration.as_ref(),
-            ctx.accounts.leader_wallet.as_ref(),
+            ctx.accounts.community_registration.as_deref(),
+            ctx.accounts.leader_wallet.as_ref().map(|a| a.to_account_info()),
         )?)
     } else {
         None
@@ -433,6 +433,6 @@ pub fn process_take_bid_legacy<'info>(
         escrow_prog: &ctx.accounts.escrow_program,
         system_prog: &ctx.accounts.system_program,
         community_split,
-        community_registration: ctx.accounts.community_registration.as_mut(),
+        community_registration: ctx.accounts.community_registration.as_deref_mut(),
     })
 }

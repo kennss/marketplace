@@ -202,12 +202,32 @@ codama.update(
         c.variablePdaSeedNode("mint", c.publicKeyTypeNode()),
       ],
     },
+    // SnowChat Community Fee Share — PDA keyed by collection mint.
+    communityRegistration: {
+      seeds: [
+        c.constantPdaSeedNodeFromString("utf8", "community_registration"),
+        c.variablePdaSeedNode("collectionMint", c.publicKeyTypeNode()),
+      ],
+    },
   }),
 );
 
 // Update instructions.
 codama.update(
   c.updateInstructionsVisitor({
+    // SnowChat Community Fee Share — register auto-derives the
+    // registration PDA from collectionMint. Revoke cannot: its account
+    // graph does not include collection_mint (seeds-constraint checks
+    // registration.collection_mint on-chain), so callers must supply
+    // `registration` explicitly — use findCommunityRegistrationPda from
+    // the PDAs module.
+    registerCommunityCollection: {
+      accounts: {
+        registration: {
+          defaultValue: c.pdaValueNode("communityRegistration"),
+        },
+      },
+    },
     // set cosigner to be an optional signer
     buyLegacy: {
       accounts: {

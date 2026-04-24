@@ -9,4 +9,5 @@
 export * from './assetListState';
 export * from './bidState';
 export * from './bidTa';
+export * from './communityRegistration';
 export * from './listState';

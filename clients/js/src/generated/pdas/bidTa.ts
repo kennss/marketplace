@@ -22,9 +22,7 @@ export async function findBidTaPda(
   seeds: BidTaSeeds,
   config: { programAddress?: Address | undefined } = {}
 ): Promise<ProgramDerivedAddress> {
-  const {
-    programAddress = 'TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp' as Address<'TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp'>,
-  } = config;
+  const { programAddress = '' as Address<''> } = config;
   return await getProgramDerivedAddress({
     programAddress,
     seeds: [

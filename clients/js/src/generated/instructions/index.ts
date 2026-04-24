@@ -35,6 +35,8 @@ export * from './listCore';
 export * from './listLegacy';
 export * from './listT22';
 export * from './listWns';
+export * from './registerCommunityCollection';
+export * from './revokeCommunityCollection';
 export * from './takeBidCompressedFullMeta';
 export * from './takeBidCompressedMetaHash';
 export * from './takeBidCore';

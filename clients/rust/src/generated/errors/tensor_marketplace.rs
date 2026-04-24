@@ -157,6 +157,42 @@ pub enum TensorMarketplaceError {
     /// 6148 - Invalid mint
     #[error("Invalid mint")]
     InvalidMint = 0x1804,
+    /// 6200 - update authority does not match leader signer
+    #[error("update authority does not match leader signer")]
+    CommunityUpdateAuthorityMismatch = 0x1838,
+    /// 6201 - NFT metadata has no creators
+    #[error("NFT metadata has no creators")]
+    CommunityNoCreators = 0x1839,
+    /// 6202 - leader is not a verified creator on the metadata
+    #[error("leader is not a verified creator on the metadata")]
+    CommunityLeaderNotVerified = 0x183A,
+    /// 6203 - registration cooldown still active (30 days)
+    #[error("registration cooldown still active (30 days)")]
+    CommunityCooldownActive = 0x183B,
+    /// 6204 - registration already revoked
+    #[error("registration already revoked")]
+    CommunityAlreadyRevoked = 0x183C,
+    /// 6205 - registration is revoked
+    #[error("registration is revoked")]
+    CommunityRegistrationRevoked = 0x183D,
+    /// 6206 - collection mint mismatch between registration and listing
+    #[error("collection mint mismatch between registration and listing")]
+    CommunityCollectionMismatch = 0x183E,
+    /// 6207 - leader wallet account is required when community registration provided
+    #[error("leader wallet account is required when community registration provided")]
+    CommunityLeaderAccountMissing = 0x183F,
+    /// 6208 - leader wallet does not match registration
+    #[error("leader wallet does not match registration")]
+    CommunityLeaderMismatch = 0x1840,
+    /// 6209 - metadata hash mismatch — collection updated since registration
+    #[error("metadata hash mismatch — collection updated since registration")]
+    CommunityMetadataHashMismatch = 0x1841,
+    /// 6210 - NFT metadata has no collection link
+    #[error("NFT metadata has no collection link")]
+    CommunityNoCollection = 0x1842,
+    /// 6211 - schema version mismatch on community registration
+    #[error("schema version mismatch on community registration")]
+    CommunityWrongVersion = 0x1843,
 }
 
 impl solana_program::program_error::PrintProgramError for TensorMarketplaceError {

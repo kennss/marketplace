@@ -41,7 +41,7 @@ pub fn apply_community_share<'info>(
     metadata: &Metadata,
     metadata_account: &AccountInfo<'info>,
     registration: Option<&Account<'info, CommunityRegistration>>,
-    leader_wallet: Option<&UncheckedAccount<'info>>,
+    leader_wallet: Option<AccountInfo<'info>>,
 ) -> Result<CommunityShareSplit<'info>> {
     let Some(reg) = registration else {
         // No registration → preserve existing Tensor behavior — entire
@@ -118,7 +118,7 @@ pub fn apply_community_share<'info>(
     Ok(CommunityShareSplit {
         platform_share,
         leader_share,
-        leader_account: Some(leader.to_account_info()),
+        leader_account: Some(leader),
     })
 }
 
