@@ -1,8 +1,7 @@
 // @file        clients/js/test/community/revoke.test.ts
 // @description SnowChat Community Fee Share — RevokeCommunityCollection
-//              rejection path tests. The 30-day cooldown happy path
-//              requires a validator warp that ava does not expose, so
-//              it is covered by the devnet E2E suite (Phase B-5).
+//              rejection tests. Happy-path (cooldown expired) requires a
+//              validator warp not exposed by ava; devnet E2E handles that.
 // @author      Kennt Kim
 // @company     Calida Lab
 // @created     2026-04-24
@@ -31,32 +30,28 @@ import {
   makeChannelIdBytes,
   makeClient,
   makeSnowchatIdBytes,
-  mintCommunityEligibleNft,
+  mintSealedCommunityPair,
   registerCollection,
 } from './_common.js';
 
 test('revoke — rejects cooldown active (same-block after register)', async (t) => {
   const client = makeClient();
-  const { leader, payer } = await getCommunitySigners(client);
-  const { mint, metadata } = await mintCommunityEligibleNft({
+  const { leader } = await getCommunitySigners(client);
+  const { collectionMint, collectionMetadata } = await mintSealedCommunityPair({
     client,
-    payer,
     leader,
   });
 
   await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
   });
 
-  // Attempting to revoke ~1 slot after register — elapsed << 30d.
-  const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
-  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
   const ix = getRevokeCommunityCollectionInstruction({
     registration,
     leader,
@@ -77,26 +72,23 @@ test('revoke — rejects cooldown active (same-block after register)', async (t)
 
 test('revoke — rejects when non-leader signs', async (t) => {
   const client = makeClient();
-  const { leader, payer } = await getCommunitySigners(client);
+  const { leader } = await getCommunitySigners(client);
   const impostor = await generateKeyPairSignerWithSol(client, ONE_SOL);
-  const { mint, metadata } = await mintCommunityEligibleNft({
+  const { collectionMint, collectionMetadata } = await mintSealedCommunityPair({
     client,
-    payer,
     leader,
   });
 
   await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
   });
 
-  const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
-  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
   const ix = getRevokeCommunityCollectionInstruction({
     registration,
     leader: impostor,

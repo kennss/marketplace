@@ -19,7 +19,10 @@ import {
   pipe,
 } from '@solana/web3.js';
 import { getTransferSolInstruction } from '@solana-program/system';
-import { createDefaultNftInCollection } from '@tensor-foundation/mpl-token-metadata';
+import {
+  createDefaultNftInCollection,
+  getUpdateMetadataAccountV2Instruction,
+} from '@tensor-foundation/mpl-token-metadata';
 import {
   createDefaultSolanaClient,
   createDefaultTransaction,
@@ -39,7 +42,7 @@ import {
   getRegisterCommunityCollectionInstructionAsync,
 } from '../src/index.js';
 
-const PROGRAM_ADDRESS = address('GttgK9zRrPpVcMKnw4BkQSKQ3o4JDc1FkMU8nggc6DSp');
+const PROGRAM_ADDRESS = address('BJMvy7BcwsTXyHP6Ua7ekeE7DUoN2i9KrQyEhgqVJ32z');
 const DEVNET_RPC = 'https://api.devnet.solana.com';
 const KEYPAIR_PATH = join(homedir(), '.config', 'solana', 'id.json');
 
@@ -119,6 +122,23 @@ async function main() {
   const mint = item.mint;
   console.log(`  collection  : ${collectionMint}`);
   console.log(`  child mint  : ${mint}`);
+
+  // P1-1: seal collection metadata (is_mutable = false) so
+  // `register_community_collection` accepts it.
+  console.log('▶ sealing collection metadata...');
+  const sealIx = getUpdateMetadataAccountV2Instruction({
+    metadata: collectionMetadata,
+    updateAuthority: leader,
+    data: null,
+    updateAuthorityArg: null,
+    primarySaleHappened: null,
+    isMutable: false,
+  });
+  await pipe(
+    await createDefaultTransaction(client, leader),
+    (tx) => appendTransactionMessageInstruction(sealIx, tx),
+    (tx) => signAndSendTransaction(client, tx)
+  );
 
   // Register the community collection. PDA seed uses the COLLECTION mint.
   console.log('▶ register_community_collection...');

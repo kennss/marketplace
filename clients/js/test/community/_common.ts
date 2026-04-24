@@ -1,7 +1,9 @@
 // @file        clients/js/test/community/_common.ts
-// @description Helpers for SnowChat Community Fee Share ava tests. Handles
-//              NFT minting with a verified leader-creator, PDA derivation,
-//              and the register/revoke instruction plumbing.
+// @description Helpers for SnowChat Community Fee Share ava tests.
+//              Post-audit (Phase B.5) rewrite: mints a properly-verified
+//              Metaplex Collection + child NFT, seals the collection
+//              metadata (`is_mutable=false`) so `register_community_collection`
+//              accepts it, and exposes register / revoke / fetch helpers.
 // @author      Kennt Kim
 // @company     Calida Lab
 // @created     2026-04-24
@@ -13,7 +15,10 @@ import {
   KeyPairSigner,
   pipe,
 } from '@solana/web3.js';
-import { createDefaultNft } from '@tensor-foundation/mpl-token-metadata';
+import {
+  createDefaultNftInCollection,
+  getUpdateMetadataAccountV2Instruction,
+} from '@tensor-foundation/mpl-token-metadata';
 import {
   Client,
   createDefaultSolanaClient,
@@ -33,6 +38,7 @@ export const SNOWCHAT_ID_LEN = 36;
 export const CHANNEL_ID_LEN = 32;
 export const COOLDOWN_SECS = 30 * 24 * 60 * 60;
 export const LEADER_SHARE_BPS = 5_000n;
+export const MIN_LEADER_SHARE_LAMPORTS = 1_000n;
 
 export interface CommunitySigners {
   leader: KeyPairSigner;
@@ -51,9 +57,6 @@ export async function getCommunitySigners(
   return { leader, buyer, seller, payer };
 }
 
-/**
- * Build a fake but well-formed SnowChat ID bytes buffer ("snow" + 32 hex = 36).
- */
 export function makeSnowchatIdBytes(hexSuffix?: string): Array<number> {
   const suffix =
     hexSuffix ??
@@ -70,10 +73,9 @@ export function makeSnowchatIdBytes(hexSuffix?: string): Array<number> {
   return Array.from(new TextEncoder().encode(ascii));
 }
 
-/**
- * Build a 32-byte channel_id buffer from a stable seed.
- */
-export function makeChannelIdBytes(seed = 'SnowChatCommunityChannelSeedXX00'): Uint8Array {
+export function makeChannelIdBytes(
+  seed = 'SnowChatCommunityChannelSeedXX00'
+): Uint8Array {
   if (seed.length !== CHANNEL_ID_LEN) {
     throw new Error(
       `channel_id seed must be ${CHANNEL_ID_LEN} ASCII bytes (got ${seed.length})`
@@ -82,55 +84,101 @@ export function makeChannelIdBytes(seed = 'SnowChatCommunityChannelSeedXX00'): U
   return new TextEncoder().encode(seed);
 }
 
-export interface MintedCollectionParams {
+export interface CommunityPair {
+  /** Parent Collection NFT — registration uses this mint as PDA seed. */
+  collectionMint: Address;
+  /** Collection metadata PDA (leader is update_authority + verified creator). */
+  collectionMetadata: Address;
+  /** Child NFT — the actual asset that gets listed/bought. */
+  itemMint: Address;
+  /** Child metadata PDA (verified=true member of the collection). */
+  itemMetadata: Address;
+}
+
+/**
+ * Mint a properly-verified Collection + child NFT pair where `leader` is the
+ * update_authority and auto-verified creator on both. The collection metadata
+ * is sealed (`is_mutable = false`) so `register_community_collection` will
+ * accept it under the new P1-1 check.
+ *
+ * The child NFT's `metadata.collection.verified` is set to true by
+ * `createDefaultNftInCollection`'s internal `VerifyCollectionV1` call.
+ */
+export async function mintSealedCommunityPair({
+  client,
+  leader,
+}: {
   client: Client;
-  payer: KeyPairSigner;
   leader: KeyPairSigner;
-  buyerAddress?: Address;
-}
-
-export interface MintedCollection {
-  mint: Address;
-  metadata: Address;
-  owner: Address;
-}
-
-/**
- * Mint an NFT where `leader` is both the update_authority AND a verified
- * creator with 100% share. This is the canonical configuration required
- * by `apply_community_share` (leader_wallet must appear with verified=true
- * in metadata.creators[]).
- */
-export async function mintCommunityEligibleNft(
-  params: MintedCollectionParams
-): Promise<MintedCollection> {
-  const { client, payer, leader, buyerAddress } = params;
-  const owner = buyerAddress ?? payer.address;
-  const { mint, metadata } = await createDefaultNft({
+}): Promise<CommunityPair> {
+  const { collection, item } = await createDefaultNftInCollection({
     client,
-    payer,
+    payer: leader,
     authority: leader,
-    owner,
+    owner: leader.address,
   });
-  return { mint, metadata, owner };
+
+  // Seal collection metadata so P1-1 passes. The other fields are untouched
+  // (data=null, updateAuthorityArg=null, primarySaleHappened=null).
+  const sealIx = getUpdateMetadataAccountV2Instruction({
+    metadata: collection.metadata,
+    updateAuthority: leader,
+    data: null,
+    updateAuthorityArg: null,
+    primarySaleHappened: null,
+    isMutable: false,
+  });
+  await pipe(
+    await createDefaultTransaction(client, leader),
+    (tx) => appendTransactionMessageInstruction(sealIx, tx),
+    (tx) => signAndSendTransaction(client, tx)
+  );
+
+  return {
+    collectionMint: collection.mint,
+    collectionMetadata: collection.metadata,
+    itemMint: item.mint,
+    itemMetadata: item.metadata,
+  };
 }
 
 /**
- * Register the collection on-chain with `leader` as the community leader.
- * Returns the derived registration PDA.
+ * Mint a pair WITHOUT sealing the collection metadata. Useful for testing
+ * that `register_community_collection` rejects mutable metadata (P1-1).
  */
+export async function mintUnsealedCommunityPair({
+  client,
+  leader,
+}: {
+  client: Client;
+  leader: KeyPairSigner;
+}): Promise<CommunityPair> {
+  const { collection, item } = await createDefaultNftInCollection({
+    client,
+    payer: leader,
+    authority: leader,
+    owner: leader.address,
+  });
+  return {
+    collectionMint: collection.mint,
+    collectionMetadata: collection.metadata,
+    itemMint: item.mint,
+    itemMetadata: item.metadata,
+  };
+}
+
 export async function registerCollection({
   client,
   leader,
   collectionMint,
-  metadata,
+  collectionMetadata,
   leaderSnowchatId,
   channelId,
 }: {
   client: Client;
   leader: KeyPairSigner;
   collectionMint: Address;
-  metadata: Address;
+  collectionMetadata: Address;
   leaderSnowchatId: Array<number>;
   channelId: Uint8Array;
 }): Promise<Address> {
@@ -140,7 +188,7 @@ export async function registerCollection({
   const ix = await getRegisterCommunityCollectionInstructionAsync({
     registration,
     collectionMint,
-    metadata,
+    metadata: collectionMetadata,
     leader,
     leaderSnowchatId,
     channelId,
@@ -153,10 +201,6 @@ export async function registerCollection({
   return registration;
 }
 
-/**
- * Revoke a previously registered collection. Marks soft-delete + emits
- * event. Cooldown enforced on-chain (30 days since registration).
- */
 export async function revokeCollection({
   client,
   leader,
@@ -184,10 +228,6 @@ export async function fetchRegistration(client: Client, registration: Address) {
   return await fetchCommunityRegistration(client.rpc, registration);
 }
 
-/**
- * Fresh Solana client per test — each ava test gets its own validator state
- * via @tensor-foundation/test-helpers localnet fixture.
- */
 export function makeClient(): Client {
   return createDefaultSolanaClient();
 }

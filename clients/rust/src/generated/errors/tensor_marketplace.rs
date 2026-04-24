@@ -193,6 +193,15 @@ pub enum TensorMarketplaceError {
     /// 6211 - schema version mismatch on community registration
     #[error("schema version mismatch on community registration")]
     CommunityWrongVersion = 0x1843,
+    /// 6212 - community leader wallet must be System-owned (regular SOL wallet)
+    #[error("community leader wallet must be System-owned (regular SOL wallet)")]
+    CommunityLeaderNotSystemOwned = 0x1844,
+    /// 6213 - community collection metadata must be sealed (is_mutable = false)
+    #[error("community collection metadata must be sealed (is_mutable = false)")]
+    CommunityMetadataMutable = 0x1845,
+    /// 6214 - community NFT collection membership must be verified
+    #[error("community NFT collection membership must be verified")]
+    CommunityCollectionNotVerified = 0x1846,
 }
 
 impl solana_program::program_error::PrintProgramError for TensorMarketplaceError {

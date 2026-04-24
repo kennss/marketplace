@@ -136,6 +136,12 @@ export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH = 0x1841
 export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION = 0x1842; // 6210
 /** CommunityWrongVersion: schema version mismatch on community registration */
 export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_WRONG_VERSION = 0x1843; // 6211
+/** CommunityLeaderNotSystemOwned: community leader wallet must be System-owned (regular SOL wallet) */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_SYSTEM_OWNED = 0x1844; // 6212
+/** CommunityMetadataMutable: community collection metadata must be sealed (is_mutable = false) */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_MUTABLE = 0x1845; // 6213
+/** CommunityCollectionNotVerified: community NFT collection membership must be verified */
+export const TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_NOT_VERIFIED = 0x1846; // 6214
 
 export type TensorMarketplaceError =
   | typeof TENSOR_MARKETPLACE_ERROR__ARITHMETIC_ERROR
@@ -158,11 +164,14 @@ export type TensorMarketplaceError =
   | typeof TENSOR_MARKETPLACE_ERROR__CANNOT_MODIFY_TARGET
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_ALREADY_REVOKED
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_NOT_VERIFIED
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_COOLDOWN_ACTIVE
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_ACCOUNT_MISSING
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_SYSTEM_OWNED
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_VERIFIED
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH
+  | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_MUTABLE
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_CREATORS
   | typeof TENSOR_MARKETPLACE_ERROR__COMMUNITY_REGISTRATION_REVOKED
@@ -225,11 +234,14 @@ if (process.env.NODE_ENV !== 'production') {
     [TENSOR_MARKETPLACE_ERROR__CANNOT_MODIFY_TARGET]: `cannot modify bid target, create a new bid`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_ALREADY_REVOKED]: `registration already revoked`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_MISMATCH]: `collection mint mismatch between registration and listing`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_COLLECTION_NOT_VERIFIED]: `community NFT collection membership must be verified`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_COOLDOWN_ACTIVE]: `registration cooldown still active (30 days)`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_ACCOUNT_MISSING]: `leader wallet account is required when community registration provided`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_MISMATCH]: `leader wallet does not match registration`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_SYSTEM_OWNED]: `community leader wallet must be System-owned (regular SOL wallet)`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_LEADER_NOT_VERIFIED]: `leader is not a verified creator on the metadata`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_HASH_MISMATCH]: `metadata hash mismatch — collection updated since registration`,
+    [TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_MUTABLE]: `community collection metadata must be sealed (is_mutable = false)`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_COLLECTION]: `NFT metadata has no collection link`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_NO_CREATORS]: `NFT metadata has no creators`,
     [TENSOR_MARKETPLACE_ERROR__COMMUNITY_REGISTRATION_REVOKED]: `registration is revoked`,

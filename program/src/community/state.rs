@@ -63,12 +63,19 @@ pub struct CommunityRegistration {
     ///   4 = update_authority_changed
     pub revoked_reason: u8,
 
-    /// Lamports of community share routed cumulative. Atomic increment on
-    /// every successful Buy/TakeBid. Source of truth for off-chain dashboard
-    /// + monthly settlement (Agent A P1-5).
+    /// Lamports of community share routed cumulative. **SOL flows only.**
+    /// Atomic increment on every successful SOL-currency Buy/TakeBid via
+    /// `record_share_distribution`. SPL currency (USDC/TNSR/etc.) Buy
+    /// flows intentionally do NOT increment this counter — mixing
+    /// different smallest-unit scales in the same `u64` would corrupt
+    /// monthly settlement and audit (see Agent A P0-1 / §17.11). SPL
+    /// aggregation lives off-chain in indexer events.
     pub cumulative_share_lamports: u64,
 
     /// Number of trades that routed share to this registration.
+    /// **SOL flows only** for the same reason as `cumulative_share_lamports`
+    /// — incrementing on SPL flows would make the counter semantically
+    /// ambiguous when reconciling against lamport totals.
     pub trade_count: u64,
 
     /// Reserved for forward compatibility (e.g. tier-based split ratios,

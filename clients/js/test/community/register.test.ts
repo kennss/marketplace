@@ -1,8 +1,8 @@
 // @file        clients/js/test/community/register.test.ts
 // @description SnowChat Community Fee Share — RegisterCommunityCollection
 //              instruction integration tests. Covers happy path + the
-//              Agent A/B-flagged validation failures that must be rejected
-//              on-chain.
+//              Phase B.5 audit rejections (P0-D System-owned leader,
+//              P1-1 sealed metadata).
 // @author      Kennt Kim
 // @company     Calida Lab
 // @created     2026-04-24
@@ -22,6 +22,7 @@ import test from 'ava';
 import {
   findCommunityRegistrationPda,
   getRegisterCommunityCollectionInstructionAsync,
+  TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_MUTABLE,
   TENSOR_MARKETPLACE_ERROR__COMMUNITY_UPDATE_AUTHORITY_MISMATCH,
 } from '../../src/index.js';
 import { expectCustomError } from '../_common.js';
@@ -31,16 +32,16 @@ import {
   makeChannelIdBytes,
   makeClient,
   makeSnowchatIdBytes,
-  mintCommunityEligibleNft,
+  mintSealedCommunityPair,
+  mintUnsealedCommunityPair,
   registerCollection,
 } from './_common.js';
 
 test('register — happy path initialises PDA with snapshot', async (t) => {
   const client = makeClient();
-  const { leader, payer } = await getCommunitySigners(client);
-  const { mint, metadata } = await mintCommunityEligibleNft({
+  const { leader } = await getCommunitySigners(client);
+  const { collectionMint, collectionMetadata } = await mintSealedCommunityPair({
     client,
-    payer,
     leader,
   });
 
@@ -50,8 +51,8 @@ test('register — happy path initialises PDA with snapshot', async (t) => {
   const registration = await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: snowchatId,
     channelId,
   });
@@ -61,40 +62,35 @@ test('register — happy path initialises PDA with snapshot', async (t) => {
   t.like(fetched, {
     data: {
       version: 1,
-      collectionMint: mint,
+      collectionMint,
       leaderWallet: leader.address,
       cumulativeShareLamports: 0n,
       tradeCount: 0n,
     },
   });
   t.deepEqual(Array.from(fetched.data.leaderSnowchatId), snowchatId);
-  t.deepEqual(
-    Array.from(fetched.data.channelId),
-    Array.from(channelId)
-  );
+  t.deepEqual(Array.from(fetched.data.channelId), Array.from(channelId));
   t.not(fetched.data.registeredAt, 0n);
   t.is(fetched.data.revokedAt.__option, 'None');
 });
 
 test('register — rejects when signer is not update_authority', async (t) => {
   const client = makeClient();
-  const { leader, payer } = await getCommunitySigners(client);
+  const { leader } = await getCommunitySigners(client);
   const impostor = await generateKeyPairSignerWithSol(client, ONE_SOL);
 
-  const { mint, metadata } = await mintCommunityEligibleNft({
+  const { collectionMint, collectionMetadata } = await mintSealedCommunityPair({
     client,
-    payer,
     leader,
   });
 
   const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
+    collectionMint,
   });
-
   const ix = await getRegisterCommunityCollectionInstructionAsync({
     registration,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    metadata: collectionMetadata,
     leader: impostor,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
@@ -113,33 +109,59 @@ test('register — rejects when signer is not update_authority', async (t) => {
   );
 });
 
+test('register — rejects unsealed (is_mutable=true) collection metadata [P1-1]', async (t) => {
+  const client = makeClient();
+  const { leader } = await getCommunitySigners(client);
+  const { collectionMint, collectionMetadata } = await mintUnsealedCommunityPair({
+    client,
+    leader,
+  });
+
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
+  const ix = await getRegisterCommunityCollectionInstructionAsync({
+    registration,
+    collectionMint,
+    metadata: collectionMetadata,
+    leader,
+    leaderSnowchatId: makeSnowchatIdBytes(),
+    channelId: makeChannelIdBytes(),
+  });
+
+  const promise = pipe(
+    await createDefaultTransaction(client, leader),
+    (tx) => appendTransactionMessageInstruction(ix, tx),
+    (tx) => signAndSendTransaction(client, tx)
+  );
+
+  await expectCustomError(
+    t,
+    promise,
+    TENSOR_MARKETPLACE_ERROR__COMMUNITY_METADATA_MUTABLE
+  );
+});
+
 test('register — rejects duplicate registration (same collection_mint)', async (t) => {
   const client = makeClient();
-  const { leader, payer } = await getCommunitySigners(client);
-  const { mint, metadata } = await mintCommunityEligibleNft({
+  const { leader } = await getCommunitySigners(client);
+  const { collectionMint, collectionMetadata } = await mintSealedCommunityPair({
     client,
-    payer,
     leader,
   });
 
   await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
   });
 
-  // Second attempt — PDA already exists, `init` fails with Anchor
-  // constraint error (account already initialised).
-  const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
-  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
   const ix = await getRegisterCommunityCollectionInstructionAsync({
     registration,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    metadata: collectionMetadata,
     leader,
     leaderSnowchatId: makeSnowchatIdBytes('deadbeefcafebabe1234567890abcdef'),
     channelId: makeChannelIdBytes(),

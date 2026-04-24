@@ -1,9 +1,9 @@
 // @file        clients/js/test/community/buyWithCommunity.test.ts
 // @description SnowChat Community Fee Share — buy with / without community
-//              registration, verifying fee split. Tensor's protocol_fee
-//              (50% of TAKER_FEE_BPS) is split 50/50 between the platform
-//              fee_vault and the registered leader wallet when the buy
-//              instruction supplies the optional community trio.
+//              registration, verifying fee split and the Phase B.5 audit
+//              rejections (P0-B dust redirect, leader_wallet mismatch).
+//              Uses `createDefaultNftInCollection` so `metadata.collection.verified`
+//              is true, satisfying `apply_community_share` check (2).
 // @author      Kennt Kim
 // @company     Calida Lab
 // @created     2026-04-24
@@ -11,11 +11,9 @@
 
 import {
   appendTransactionMessageInstruction,
-  assertAccountExists,
   fetchEncodedAccount,
   pipe,
 } from '@solana/web3.js';
-import { createDefaultNft } from '@tensor-foundation/mpl-token-metadata';
 import {
   createDefaultTransaction,
   generateKeyPairSignerWithSol,
@@ -24,6 +22,7 @@ import {
 } from '@tensor-foundation/test-helpers';
 import test from 'ava';
 import {
+  fetchCommunityRegistration,
   findCommunityRegistrationPda,
   findListStatePda,
   getBuyLegacyInstructionAsync,
@@ -44,17 +43,16 @@ import {
   makeChannelIdBytes,
   makeClient,
   makeSnowchatIdBytes,
+  mintSealedCommunityPair,
+  MIN_LEADER_SHARE_LAMPORTS,
   registerCollection,
 } from './_common.js';
 
-const LISTING_PRICE = 1_000_000_000n; // 1 SOL
+const LISTING_PRICE = 1_000_000_000n; // 1 SOL — yields leader_share = 2_500_000 lamports (well above dust).
+const DUST_LISTING_PRICE = 100_000n; // 0.0001 SOL — yields leader_share = 250 lamports < MIN (1000) → dust redirect.
 
-/**
- * Compute Tensor's protocol_fee given a listing amount. Mirrors on-chain
- * `calc_fees` output for the protocol portion (total - broker portion).
- */
-function expectedProtocolFee(listingPrice: bigint): bigint {
-  const totalFee = (listingPrice * TAKER_FEE_BPS) / BASIS_POINTS;
+function expectedProtocolFee(price: bigint): bigint {
+  const totalFee = (price * TAKER_FEE_BPS) / BASIS_POINTS;
   const brokerFee = (totalFee * BROKER_FEE_PCT) / HUNDRED_PCT;
   return totalFee - brokerFee;
 }
@@ -65,34 +63,27 @@ function expectedLeaderShare(protocolFee: bigint): bigint {
 
 test('buy — community split sends 50% of protocol fee to leader', async (t) => {
   const client = makeClient();
-  const { leader, buyer, payer } = await getCommunitySigners(client);
+  const { leader, buyer } = await getCommunitySigners(client);
 
-  // Mint an NFT where leader is both update_authority AND verified creator,
-  // owned by leader so leader can list it.
-  const { mint, metadata } = await createDefaultNft({
-    client,
-    payer,
-    authority: leader,
-    owner: leader.address,
-  });
+  const {
+    collectionMint,
+    collectionMetadata,
+    itemMint,
+  } = await mintSealedCommunityPair({ client, leader });
 
-  // Register community collection.
   await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
   });
-  const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
-  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
 
-  // List the NFT.
   const listIx = await getListLegacyInstructionAsync({
     owner: leader,
-    mint,
+    mint: itemMint,
     amount: LISTING_PRICE,
   });
   await pipe(
@@ -102,19 +93,11 @@ test('buy — community split sends 50% of protocol fee to leader', async (t) =>
     (tx) => signAndSendTransaction(client, tx)
   );
 
-  const [listing] = await findListStatePda({ mint });
-  assertAccountExists(await fetchEncodedAccount(client.rpc, listing));
-
-  const leaderBefore = BigInt(
-    (await client.rpc.getBalance(leader.address).send()).value
-  );
-
-  // Buy with community accounts provided.
   const buyIx = await getBuyLegacyInstructionAsync({
     owner: leader.address,
     payer: buyer,
-    mint,
-    maxAmount: LISTING_PRICE + LISTING_PRICE, // generous ceiling for royalties
+    mint: itemMint,
+    maxAmount: LISTING_PRICE + LISTING_PRICE,
     creators: [leader.address],
     communityRegistration: registration,
     leaderWallet: leader.address,
@@ -126,44 +109,84 @@ test('buy — community split sends 50% of protocol fee to leader', async (t) =>
     (tx) => signAndSendTransaction(client, tx)
   );
 
-  const leaderAfter = BigInt(
-    (await client.rpc.getBalance(leader.address).send()).value
-  );
-
-  // Leader wallet receives: listing amount (as seller) + protocol_fee/2
-  // (as community leader) + full creator fee (as sole creator). We assert
-  // the delta is at least amount + leader_share — a stricter exact-equals
-  // check would need to subtract listing/rent refunds which leak noise.
   const protocolFee = expectedProtocolFee(LISTING_PRICE);
   const leaderShare = expectedLeaderShare(protocolFee);
-  const delta = leaderAfter - leaderBefore;
 
-  t.true(
-    delta >= LISTING_PRICE + leaderShare,
-    `leader delta=${delta} expected >= ${LISTING_PRICE + leaderShare}`
+  const reg = await fetchCommunityRegistration(client.rpc, registration);
+  t.is(reg.data.cumulativeShareLamports, leaderShare);
+  t.is(reg.data.tradeCount, 1n);
+});
+
+test('buy — dust redirect: leader_share < MIN_LEADER_SHARE_LAMPORTS merges to platform [P0-B]', async (t) => {
+  const client = makeClient();
+  const { leader, buyer } = await getCommunitySigners(client);
+
+  const {
+    collectionMint,
+    collectionMetadata,
+    itemMint,
+  } = await mintSealedCommunityPair({ client, leader });
+
+  await registerCollection({
+    client,
+    leader,
+    collectionMint,
+    collectionMetadata,
+    leaderSnowchatId: makeSnowchatIdBytes(),
+    channelId: makeChannelIdBytes(),
+  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
+
+  const listIx = await getListLegacyInstructionAsync({
+    owner: leader,
+    mint: itemMint,
+    amount: DUST_LISTING_PRICE,
+  });
+  await pipe(
+    await createDefaultTransaction(client, leader),
+    (tx) => appendTransactionMessageInstruction(computeIx, tx),
+    (tx) => appendTransactionMessageInstruction(listIx, tx),
+    (tx) => signAndSendTransaction(client, tx)
   );
 
-  // Registration PDA's cumulative stats were incremented.
-  const { fetchCommunityRegistration } = await import('../../src/index.js');
-  const fetched = await fetchCommunityRegistration(client.rpc, registration);
-  t.is(fetched.data.cumulativeShareLamports, leaderShare);
-  t.is(fetched.data.tradeCount, 1n);
+  // Sanity-check our fixture: expected leader_share must actually be below MIN.
+  const expected = expectedLeaderShare(expectedProtocolFee(DUST_LISTING_PRICE));
+  t.true(
+    expected < MIN_LEADER_SHARE_LAMPORTS,
+    `fixture: expected leader_share ${expected} must be below MIN ${MIN_LEADER_SHARE_LAMPORTS}`
+  );
+
+  const buyIx = await getBuyLegacyInstructionAsync({
+    owner: leader.address,
+    payer: buyer,
+    mint: itemMint,
+    maxAmount: DUST_LISTING_PRICE + DUST_LISTING_PRICE,
+    creators: [leader.address],
+    communityRegistration: registration,
+    leaderWallet: leader.address,
+  });
+  await pipe(
+    await createDefaultTransaction(client, buyer),
+    (tx) => appendTransactionMessageInstruction(computeIx, tx),
+    (tx) => appendTransactionMessageInstruction(buyIx, tx),
+    (tx) => signAndSendTransaction(client, tx)
+  );
+
+  // PDA counters must stay at zero — dust was merged into platform vault.
+  const reg = await fetchCommunityRegistration(client.rpc, registration);
+  t.is(reg.data.cumulativeShareLamports, 0n);
+  t.is(reg.data.tradeCount, 0n);
 });
 
 test('buy — without community (baseline) matches upstream Tensor', async (t) => {
   const client = makeClient();
-  const { leader, buyer, payer } = await getCommunitySigners(client);
+  const { leader, buyer } = await getCommunitySigners(client);
 
-  const { mint } = await createDefaultNft({
-    client,
-    payer,
-    authority: leader,
-    owner: leader.address,
-  });
+  const { itemMint } = await mintSealedCommunityPair({ client, leader });
 
   const listIx = await getListLegacyInstructionAsync({
     owner: leader,
-    mint,
+    mint: itemMint,
     amount: LISTING_PRICE,
   });
   await pipe(
@@ -173,11 +196,10 @@ test('buy — without community (baseline) matches upstream Tensor', async (t) =
     (tx) => signAndSendTransaction(client, tx)
   );
 
-  // Buy with NO community accounts (baseline behaviour).
   const buyIx = await getBuyLegacyInstructionAsync({
     owner: leader.address,
     payer: buyer,
-    mint,
+    mint: itemMint,
     maxAmount: LISTING_PRICE + LISTING_PRICE,
     creators: [leader.address],
   });
@@ -188,38 +210,34 @@ test('buy — without community (baseline) matches upstream Tensor', async (t) =
     (tx) => signAndSendTransaction(client, tx)
   );
 
-  // Listing account is closed — trade completed.
-  const [listing] = await findListStatePda({ mint });
+  const [listing] = await findListStatePda({ mint: itemMint });
   t.false((await fetchEncodedAccount(client.rpc, listing)).exists);
 });
 
 test('buy — rejects when leader_wallet does not match registration', async (t) => {
   const client = makeClient();
-  const { leader, buyer, payer } = await getCommunitySigners(client);
+  const { leader, buyer } = await getCommunitySigners(client);
   const attacker = await generateKeyPairSignerWithSol(client, ONE_SOL);
 
-  const { mint, metadata } = await createDefaultNft({
-    client,
-    payer,
-    authority: leader,
-    owner: leader.address,
-  });
+  const {
+    collectionMint,
+    collectionMetadata,
+    itemMint,
+  } = await mintSealedCommunityPair({ client, leader });
 
   await registerCollection({
     client,
     leader,
-    collectionMint: mint,
-    metadata,
+    collectionMint,
+    collectionMetadata,
     leaderSnowchatId: makeSnowchatIdBytes(),
     channelId: makeChannelIdBytes(),
   });
-  const [registration] = await findCommunityRegistrationPda({
-    collectionMint: mint,
-  });
+  const [registration] = await findCommunityRegistrationPda({ collectionMint });
 
   const listIx = await getListLegacyInstructionAsync({
     owner: leader,
-    mint,
+    mint: itemMint,
     amount: LISTING_PRICE,
   });
   await pipe(
@@ -229,11 +247,10 @@ test('buy — rejects when leader_wallet does not match registration', async (t)
     (tx) => signAndSendTransaction(client, tx)
   );
 
-  // Attacker passes registration but redirects leader_wallet to self.
   const buyIx = await getBuyLegacyInstructionAsync({
     owner: leader.address,
     payer: buyer,
-    mint,
+    mint: itemMint,
     maxAmount: LISTING_PRICE + LISTING_PRICE,
     creators: [leader.address],
     communityRegistration: registration,

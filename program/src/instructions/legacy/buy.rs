@@ -324,7 +324,17 @@ pub fn process_buy_legacy<'info, 'b>(
     )?;
 
     if let Some(leader_info) = community_split.leader_account.as_ref() {
-        transfer_lamports(&ctx.accounts.payer, leader_info, community_split.leader_share)?;
+        // P0-B: use rent-exempt checked transfer. If leader's balance would
+        // fall below rent-exempt after this transfer, Tensor's helper logs
+        // and skips silently — the fee_split dust guard (MIN_LEADER_SHARE_LAMPORTS)
+        // already prevents sub-dust amounts, so any skip here would indicate a
+        // leader wallet with pathological near-zero balance. We still record
+        // the intended share for audit — off-chain monitoring can reconcile.
+        transfer_lamports_checked(
+            &ctx.accounts.payer.to_account_info(),
+            leader_info,
+            community_split.leader_share,
+        )?;
         record_share_distribution(
             ctx.accounts.community_registration.as_deref_mut().unwrap(),
             community_split.leader_share,

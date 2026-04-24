@@ -19,8 +19,8 @@ use tensor_vipers::{unwrap_checked, Validate};
 
 use crate::{
     apply_community_share, assert_decode_token_account, program::MarketplaceProgram, record_event,
-    record_share_distribution, AuthorizationDataLocal, CommunityRegistration, ListState, TakeEvent,
-    Target, TcompError, TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION, TNSR_CURRENCY,
+    AuthorizationDataLocal, CommunityRegistration, ListState, TakeEvent, Target, TcompError,
+    TcompEvent, TcompSigner, CURRENT_TCOMP_VERSION, TNSR_CURRENCY,
 };
 
 #[derive(Accounts)]
@@ -494,10 +494,15 @@ pub fn process_buy_legacy_spl<'info, 'b>(
             &leader_ta.to_account_info(),
             community_split.leader_share,
         )?;
-        record_share_distribution(
-            ctx.accounts.community_registration.as_deref_mut().unwrap(),
-            community_split.leader_share,
-        )?;
+        // P0-A: do NOT call `record_share_distribution` on SPL flows.
+        // `CommunityRegistration.cumulative_share_lamports` is a `u64` counter
+        // in lamport units (1e9/SOL). SPL currencies use different smallest-
+        // unit scales (USDC=1e6, TNSR=1e9, etc.) — mixing them in the same
+        // counter yields a meaningless aggregate and corrupts monthly
+        // settlement / audit trail. Off-chain indexers aggregate SPL totals
+        // per-currency via program logs / instruction parsing. A dedicated
+        // `CommunityShareDistributed` anchor event would make this stream
+        // first-class — deferred to Phase C (spec §17.11 follow-up).
     }
 
     // Maker broker fee.

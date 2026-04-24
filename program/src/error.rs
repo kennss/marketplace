@@ -190,4 +190,13 @@ pub enum TcompError {
 
     #[msg("schema version mismatch on community registration")]
     CommunityWrongVersion = 211,
+
+    #[msg("community leader wallet must be System-owned (regular SOL wallet)")]
+    CommunityLeaderNotSystemOwned = 212,
+
+    #[msg("community collection metadata must be sealed (is_mutable = false)")]
+    CommunityMetadataMutable = 213,
+
+    #[msg("community NFT collection membership must be verified")]
+    CommunityCollectionNotVerified = 214,
 }

@@ -20,7 +20,10 @@ import {
   appendTransactionMessageInstruction,
   pipe,
 } from '@solana/web3.js';
-import { createDefaultNft } from '@tensor-foundation/mpl-token-metadata';
+import {
+  createDefaultNft,
+  getUpdateMetadataAccountV2Instruction,
+} from '@tensor-foundation/mpl-token-metadata';
 import {
   createDefaultSolanaClient,
   createDefaultTransaction,
@@ -36,7 +39,7 @@ import {
   getRegisterCommunityCollectionInstructionAsync,
 } from '../src/index.js';
 
-const PROGRAM_ADDRESS = address('GttgK9zRrPpVcMKnw4BkQSKQ3o4JDc1FkMU8nggc6DSp');
+const PROGRAM_ADDRESS = address('BJMvy7BcwsTXyHP6Ua7ekeE7DUoN2i9KrQyEhgqVJ32z');
 const DEVNET_RPC = 'https://api.devnet.solana.com';
 const KEYPAIR_PATH = join(homedir(), '.config', 'solana', 'id.json');
 
@@ -88,6 +91,22 @@ async function main() {
   });
   console.log(`  mint    : ${mint}`);
   console.log(`  metadata: ${metadata}`);
+
+  // P1-1: seal metadata so `register_community_collection` accepts it.
+  console.log('▶ sealing collection metadata (is_mutable = false)...');
+  const sealIx = getUpdateMetadataAccountV2Instruction({
+    metadata,
+    updateAuthority: leader,
+    data: null,
+    updateAuthorityArg: null,
+    primarySaleHappened: null,
+    isMutable: false,
+  });
+  await pipe(
+    await createDefaultTransaction(client, leader),
+    (tx) => appendTransactionMessageInstruction(sealIx, tx),
+    (tx) => signAndSendTransaction(client, tx)
+  );
 
   // Derive registration PDA (programAddress override because the
   // generated client has an empty default address in this IDL revision).

@@ -41,7 +41,7 @@ pub use state::*;
 pub use tensor_vipers::{prelude::*, throw_err};
 pub use whitelist_program::{self, Whitelist};
 
-declare_id!("GttgK9zRrPpVcMKnw4BkQSKQ3o4JDc1FkMU8nggc6DSp");
+declare_id!("BJMvy7BcwsTXyHP6Ua7ekeE7DUoN2i9KrQyEhgqVJ32z");
 
 #[program]
 pub mod marketplace_program {

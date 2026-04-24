@@ -56,10 +56,28 @@ pub fn process_register_community_collection(
     let collection_key = ctx.accounts.collection_mint.key();
     let metadata: Metadata = assert_decode_metadata(&collection_key, &ctx.accounts.metadata)?;
 
+    // P0-D: leader must be a regular SOL wallet (System-owned). Blocks
+    // registering a PDA of another program as the leader.
+    require!(
+        ctx.accounts.leader.to_account_info().owner
+            == &anchor_lang::solana_program::system_program::ID,
+        TcompError::CommunityLeaderNotSystemOwned,
+    );
+
     // updateAuthority must equal the signer (Agent B P1 S-3).
     require!(
         metadata.update_authority == ctx.accounts.leader.key(),
         TcompError::CommunityUpdateAuthorityMismatch,
+    );
+
+    // P1-1 (minimal): collection metadata must be sealed. Prevents
+    // post-registration mutation of `seller_fee_basis_points`, URI, creators
+    // array, etc. — which `fee_split.rs` (check (5) removed) can no longer
+    // detect dynamically. Leaders must opt-in to seal before register; once
+    // sealed, Metaplex `is_mutable` is one-way.
+    require!(
+        !metadata.is_mutable,
+        TcompError::CommunityMetadataMutable,
     );
 
     // Leader must already be a verified creator on the metadata.
@@ -75,6 +93,8 @@ pub fn process_register_community_collection(
     );
 
     // Snapshot metadata hash for later mutation detection.
+    // (v2 deferred: use this only if a dedicated `collection_metadata` account
+    // is added to buy instructions. See fee_split.rs docstring + spec §15.6.)
     let metadata_data = ctx.accounts.metadata.try_borrow_data()?;
     let metadata_hash = anchor_lang::solana_program::hash::hash(&metadata_data).to_bytes();
     drop(metadata_data);
