@@ -36,7 +36,7 @@ import {
   getRegisterCommunityCollectionInstructionAsync,
 } from '../src/index.js';
 
-const PROGRAM_ADDRESS = address('Do4bkk25CcZpuK555LwrLeb73CzggAX34yqWKkEPdGnW');
+const PROGRAM_ADDRESS = address('GttgK9zRrPpVcMKnw4BkQSKQ3o4JDc1FkMU8nggc6DSp');
 const DEVNET_RPC = 'https://api.devnet.solana.com';
 const KEYPAIR_PATH = join(homedir(), '.config', 'solana', 'id.json');
 

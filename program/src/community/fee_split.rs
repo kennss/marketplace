@@ -93,14 +93,17 @@ pub fn apply_community_share<'info>(
         TcompError::CommunityLeaderNotVerified,
     );
 
-    // (5) metadata hash freshness.
-    let metadata_data = metadata_account.try_borrow_data()?;
-    let current_hash = anchor_lang::solana_program::hash::hash(&metadata_data).to_bytes();
-    require!(
-        current_hash == reg.metadata_hash,
-        TcompError::CommunityMetadataHashMismatch,
-    );
-    drop(metadata_data); // release borrow before any other access.
+    // (5) NOTE: metadata_hash is snapshotted at register time on the
+    // COLLECTION metadata, but `metadata_account` passed here is the
+    // CHILD NFT's metadata. Comparing across different accounts would
+    // always fail. The honest mutation-detection check belongs on the
+    // collection's metadata account — a future enhancement that would
+    // require adding a dedicated collection_metadata account to the
+    // buy instructions. For now the creators[] check above (4) enforces
+    // the practical invariant: leader must be a verified creator on the
+    // specific NFT being traded. See Agent A/B audit notes §13.
+    let _ = metadata_account;
+    let _ = &reg.metadata_hash;
 
     // 50/50 split with floor-rounding via bps math. Dust (rounding remainder)
     // stays on platform side — preserves Tensor's invariant that no lamport
